@@ -214,7 +214,7 @@ fn get_interface_mtu_windows(socket: &UdpSocket) -> Result<usize, Error> {
                     // For the matching address, find local interface and its MTU.
                     for iface in ifaces {
                         if iface.InterfaceIndex == addr.InterfaceIndex {
-                            res = iface.NlMtutry_into().or(res);
+                            res = iface.NlMtu.try_into().or(res);
                             break 'addr_loop;
                         }
                     }
