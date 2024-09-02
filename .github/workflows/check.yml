@@ -72,7 +72,8 @@ jobs:
         run: |
           # shellcheck disable=SC2086
           RUST_LOG=trace cargo +${{ matrix.rust-toolchain }} llvm-cov nextest $BUILD_TYPE --no-fail-fast --lcov --output-path lcov.info
-          cargo +${{ matrix.rust-toolchain }} bench --no-run
+          # No benches at the moment
+          # cargo +${{ matrix.rust-toolchain }} bench --no-run
 
       - name: Check formatting
         run: |
