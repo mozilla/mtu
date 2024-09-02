@@ -74,10 +74,11 @@ fn get_interface_mtu_linux_macos(socket: &UdpSocket) -> Result<usize, Error> {
     use libc::{ifreq, ioctl};
 
     // Get the interface list.
-    let mut ifap: *mut ifaddrs = ptr::null_mut(); // Do not modify this pointer.
+    let mut ifap: *mut ifaddrs = ptr::null_mut();
     if unsafe { getifaddrs(&mut ifap) } != 0 {
         return Err(Error::last_os_error());
     }
+    let ifap = ifap; // Do not modify this pointer.
 
     // First, find the name of the interface with the local IP address determined above.
     let mut cursor = ifap;
