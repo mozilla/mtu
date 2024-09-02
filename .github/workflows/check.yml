@@ -1,0 +1,93 @@
+name: Check
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  merge_group:
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Build & test
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-14, windows-latest]
+        # Keep low end in sync with Cargo.toml
+        rust-toolchain: [1.76.0, stable, nightly]
+        type: [debug, release]
+    env:
+      BUILD_TYPE: ${{ matrix.type == 'release' && '--release' || '' }}
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+
+      - name: Install Rust
+        uses: mozilla/neqo/.github/actions/rust
+        with:
+          version: ${{ matrix.rust-toolchain }}
+          components: rustfmt, clippy, llvm-tools-preview
+          tools: cargo-llvm-cov, cargo-nextest, cargo-hack, cargo-machete
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build
+        run: |
+          # shellcheck disable=SC2086
+          cargo +${{ matrix.rust-toolchain }} build $BUILD_TYPE --all-targets
+
+      - name: Run tests and determine coverage
+        run: |
+          # shellcheck disable=SC2086
+          RUST_LOG=trace cargo +${{ matrix.rust-toolchain }} llvm-cov nextest $BUILD_TYPE --no-fail-fast --lcov --output-path lcov.info
+          cargo +${{ matrix.rust-toolchain }} bench --features bench --no-run
+
+      - name: Check formatting
+        run: |
+          if [ "${{ matrix.rust-toolchain }}" != "nightly" ]; then
+            CONFIG_PATH="--config-path=$(mktemp)"
+          fi
+          # shellcheck disable=SC2086
+          cargo +${{ matrix.rust-toolchain }} fmt --all -- --check $CONFIG_PATH
+        if: success() || failure()
+
+      - name: Check for unused dependencies
+        run: |
+          #  --with-metadata has false positives, see https://github.com/bnjbvr/cargo-machete/issues/127
+          cargo +${{ matrix.rust-toolchain }} machete
+
+      - name: Clippy
+        run: |
+          cargo +${{ matrix.rust-toolchain }} hack clippy --all-targets --feature-powerset --exclude-features gecko -- -D warnings || ${{ matrix.rust-toolchain == 'nightly' }}
+        if: success() || failure()
+
+      - name: Check rustdoc links
+        run: cargo +${{ matrix.rust-toolchain }} doc --workspace --no-deps --document-private-items
+        env:
+          RUSTDOCFLAGS: "--deny rustdoc::broken_intra_doc_links --deny warnings"
+        if: success() || failure()
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@e28ff129e5465c2c0dcc6f003fc735cb6ae0c673 # v4.5.0
+        with:
+          file: lcov.info
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        if: matrix.type == 'debug' && matrix.rust-toolchain == 'stable'
