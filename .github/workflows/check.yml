@@ -43,11 +43,12 @@ jobs:
           repository: mozilla/neqo
           sparse-checkout: |
             .github/actions/rust
+          path: neqo
 
       - run: find . -ls
 
       - name: Install Rust
-        uses: ./.github/actions/rust
+        uses: neqo/.github/actions/rust
         with:
           version: ${{ matrix.rust-toolchain }}
           components: rustfmt, clippy, llvm-tools-preview
