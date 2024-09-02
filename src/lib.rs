@@ -20,7 +20,20 @@ fn default_result<T>() -> Result<T, Error> {
     ))
 }
 
-/// Return the MTU of the interface that is used to reach the given remote socket address.
+/// Return the maximum transmission unit (MTU) of the local network interface towards the
+/// destination [`SocketAddr`] given in `remote`.
+///
+/// The returned MTU may exceed the maximum IP packet size of 65,535 bytes on some
+/// platforms for some remote destinations. (For example, loopback destinations on
+/// Windows.)
+///
+/// # Examples
+///
+/// ```
+/// let saddr = "127.0.0.1:443".parse().unwrap();
+/// let mtu = mtu::get_interface_mtu(&saddr).unwrap();
+/// println!("MTU towards {:?} is {}", saddr, mtu);
+/// ```
 ///
 /// # Errors
 ///
