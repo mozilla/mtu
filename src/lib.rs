@@ -21,7 +21,7 @@ fn default_result<T>() -> Result<T, Error> {
 }
 
 /// Return the maximum transmission unit (MTU) of the local network interface towards the
-/// destination `SocketAddr` given in `remote`.
+/// destination [`SocketAddr`] given in `remote`.
 ///
 /// The returned MTU may exceed the maximum IP packet size of 65,535 bytes on some
 /// platforms for some remote destinations. (For example, loopback destinations on
