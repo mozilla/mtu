@@ -108,4 +108,4 @@ jobs:
           verbose: true
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        if: matrix.type == 'debug' && matrix.rust-toolchain == 'stable'
+        if: matrix.type == 'debug' && matrix.rust-toolchain == 'stable' && endsWith(matrix.os, '-latest')
