@@ -37,8 +37,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
+      - name: Get "Install Rust" action
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        with:
+          repository: mozilla/neqo
+          path: .github/actions
+
       - name: Install Rust
-        uses: mozilla/neqo/.github/actions/rust
+        uses: ./.github/actions/rust
         with:
           version: ${{ matrix.rust-toolchain }}
           components: rustfmt, clippy, llvm-tools-preview
