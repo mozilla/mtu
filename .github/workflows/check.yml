@@ -84,12 +84,12 @@ jobs:
           cargo +${{ matrix.rust-toolchain }} bench --no-run
 
       - name: Run tests with sanitizers
-        if: (matrix.os == 'ubuntu-latest' || matrix.os == 'macos-14') && matrix.rust-toolchain == 'nightly'
+        if: (matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest') && matrix.rust-toolchain == 'nightly'
         run: |
           if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
             TARGET="x86_64-unknown-linux-gnu"
             SANITIZERS="address thread leak memory"
-          elif [ "${{ matrix.os }}" = "macos-14" ]; then
+          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
             TARGET="aarch64-apple-darwin"
             # no memory and leak sanitizer support yet
             SANITIZERS="address thread"
@@ -97,7 +97,7 @@ jobs:
 
           for sanitizer in $SANITIZERS; do
             echo "Running tests with $sanitizer sanitizer..."
-            RUSTFLAGS="-Z sanitizer=$sanitizer" cargo +nightly test -Z build-std --target $TARGET
+            RUSTFLAGS="-Z sanitizer=$sanitizer" cargo +nightly test -Z build-std --target "$TARGET"
           done
 
       - name: Check formatting
