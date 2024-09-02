@@ -25,7 +25,11 @@ jobs:
         os: [ubuntu-latest, macos-14, windows-latest]
         # Keep low end in sync with Cargo.toml
         rust-toolchain: [1.76.0, stable, nightly]
-        type: [debug, release]
+        type: [debug]
+        include:
+          - os: [ubuntu-latest, macos-14, windows-latest]
+            rust-toolchain: stable
+            type: release
     env:
       BUILD_TYPE: ${{ matrix.type == 'release' && '--release' || '' }}
     runs-on: ${{ matrix.os }}
@@ -37,15 +41,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
-      - name: Get "Install Rust" action
+      - name: Get "Install Rust" action from neqo
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           repository: mozilla/neqo
           sparse-checkout: |
             .github/actions/rust
           path: neqo
-
-      - run: find . -ls
 
       - name: Install Rust
         uses: ./neqo/.github/actions/rust
@@ -64,7 +66,7 @@ jobs:
         run: |
           # shellcheck disable=SC2086
           RUST_LOG=trace cargo +${{ matrix.rust-toolchain }} llvm-cov nextest $BUILD_TYPE --no-fail-fast --lcov --output-path lcov.info
-          cargo +${{ matrix.rust-toolchain }} bench --features bench --no-run
+          cargo +${{ matrix.rust-toolchain }} bench --no-run
 
       - name: Check formatting
         run: |
@@ -82,7 +84,7 @@ jobs:
 
       - name: Clippy
         run: |
-          cargo +${{ matrix.rust-toolchain }} hack clippy --all-targets --feature-powerset --exclude-features gecko -- -D warnings || ${{ matrix.rust-toolchain == 'nightly' }}
+          cargo +${{ matrix.rust-toolchain }} hack clippy --all-targets --feature-powerset -- -D warnings || ${{ matrix.rust-toolchain == 'nightly' }}
         if: success() || failure()
 
       - name: Check rustdoc links
