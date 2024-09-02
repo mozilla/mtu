@@ -27,7 +27,14 @@ jobs:
         rust-toolchain: [1.76.0, stable, nightly]
         type: [debug]
         include:
-          - rust-toolchain: stable
+          - os: ubuntu-latest
+            rust-toolchain: stable
+            type: release
+          - os: macos-14
+            rust-toolchain: stable
+            type: release
+          - os: windows-latest
+            rust-toolchain: stable
             type: release
     env:
       BUILD_TYPE: ${{ matrix.type == 'release' && '--release' || '' }}
