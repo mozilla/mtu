@@ -177,58 +177,61 @@ fn get_interface_mtu_windows(socket: &UdpSocket) -> Result<usize, Error> {
     let mut res = default_result();
 
     // Get a list of all unicast IP addresses with associated metadata.
-    let mut addr_table: *mut MIB_UNICASTIPADDRESS_TABLE = ptr::null_mut(); // Do not modify this pointer.
-    if unsafe { GetUnicastIpAddressTable(AF_UNSPEC, &mut addr_table) } == NO_ERROR {
-        let addrs = unsafe {
-            slice::from_raw_parts::<MIB_UNICASTIPADDRESS_ROW>(
-                &(*addr_table).Table[0],
-                (*addr_table).NumEntries as usize,
-            )
-        };
+    let mut addr_table: *mut MIB_UNICASTIPADDRESS_TABLE = ptr::null_mut();
+    if unsafe { GetUnicastIpAddressTable(AF_UNSPEC, &mut addr_table) } != NO_ERROR {
+        return Err(Error::last_os_error());
+    }
+    let addr_table = addr_table; // Do not modify this pointer.
 
-        // Get a list of all interfaces with associated metadata.
-        let mut if_table: *mut MIB_IPINTERFACE_TABLE = ptr::null_mut(); // Do not modify this pointer.
-        if unsafe { GetIpInterfaceTable(AF_UNSPEC, &mut if_table) } == NO_ERROR {
-            let ifaces = unsafe {
-                slice::from_raw_parts::<MIB_IPINTERFACE_ROW>(
-                    &(*if_table).Table[0],
-                    (*if_table).NumEntries as usize,
-                )
-            };
+    let addrs = unsafe {
+        slice::from_raw_parts::<MIB_UNICASTIPADDRESS_ROW>(
+            &(*addr_table).Table[0],
+            (*addr_table).NumEntries as usize,
+        )
+    };
 
-            // Run through the list of addresses and find the one that matches the local IP
-            // address.
-            'addr_loop: for addr in addrs {
-                let af = unsafe { addr.Address.si_family };
-                let ip = socket.local_addr()?.ip();
-                if (af == AF_INET && ip.is_ipv4() || af == AF_INET6 && ip.is_ipv6())
-                    && match ip {
-                        IpAddr::V4(ip) => {
-                            u32::from(ip).to_be()
-                                == unsafe { addr.Address.Ipv4.sin_addr.S_un.S_addr }
-                        }
-                        IpAddr::V6(ip) => {
-                            ip.octets() == unsafe { addr.Address.Ipv6.sin6_addr.u.Byte }
-                        }
-                    }
-                {
-                    // For the matching address, find local interface and its MTU.
-                    for iface in ifaces {
-                        if iface.InterfaceIndex == addr.InterfaceIndex {
-                            res = iface.NlMtu.try_into().or(res);
-                            break 'addr_loop;
-                        }
-                    }
+    // Get a list of all interfaces with associated metadata.
+    let mut if_table: *mut MIB_IPINTERFACE_TABLE = ptr::null_mut();
+    if unsafe { GetIpInterfaceTable(AF_UNSPEC, &mut if_table) } != NO_ERROR {
+        let error = Error::last_os_error();
+        unsafe { FreeMibTable(addr_table as *const c_void) };
+        return Err(error);
+    }
+    let if_table = if_table; // Do not modify this pointer.
+
+    let ifaces = unsafe {
+        slice::from_raw_parts::<MIB_IPINTERFACE_ROW>(
+            &(*if_table).Table[0],
+            (*if_table).NumEntries as usize,
+        )
+    };
+
+    // Run through the list of addresses and find the one that matches the local IP
+    // address.
+    'addr_loop: for addr in addrs {
+        let af = unsafe { addr.Address.si_family };
+        let ip = socket.local_addr()?.ip();
+        if (af == AF_INET && ip.is_ipv4() || af == AF_INET6 && ip.is_ipv6())
+            && match ip {
+                IpAddr::V4(ip) => {
+                    u32::from(ip).to_be() == unsafe { addr.Address.Ipv4.sin_addr.S_un.S_addr }
+                }
+                IpAddr::V6(ip) => ip.octets() == unsafe { addr.Address.Ipv6.sin6_addr.u.Byte },
+            }
+        {
+            // For the matching address, find local interface and its MTU.
+            for iface in ifaces {
+                if iface.InterfaceIndex == addr.InterfaceIndex {
+                    res = iface.NlMtu.try_into().or(res);
+                    break 'addr_loop;
                 }
             }
-            unsafe { FreeMibTable(if_table as *const c_void) };
-        } else {
-            res = Err(Error::last_os_error());
         }
-        unsafe { FreeMibTable(addr_table as *const c_void) };
-    } else {
-        res = Err(Error::last_os_error());
     }
+
+    unsafe { FreeMibTable(if_table as *const c_void) };
+    unsafe { FreeMibTable(addr_table as *const c_void) };
+
     res
 }
 
