@@ -68,7 +68,7 @@ jobs:
         uses: ./neqo/.github/actions/rust
         with:
           version: ${{ matrix.rust-toolchain }}
-          components: rustfmt, clippy, llvm-tools-preview
+          components: rustfmt, clippy, llvm-tools-preview, ${{ matrix.rust-toolchain == 'nightly' && 'rust-src' || '' }}
           tools: cargo-llvm-cov, cargo-nextest, cargo-hack, cargo-machete
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -82,6 +82,23 @@ jobs:
           # shellcheck disable=SC2086
           RUST_LOG=trace cargo +${{ matrix.rust-toolchain }} llvm-cov nextest $BUILD_TYPE --no-fail-fast --lcov --output-path lcov.info
           cargo +${{ matrix.rust-toolchain }} bench --no-run
+
+      - name: Run tests with sanitizers
+        if: (matrix.os == 'ubuntu-latest' || matrix.os == 'macos-14') && matrix.rust-toolchain == 'nightly'
+        run: |
+          if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+            TARGET="x86_64-unknown-linux-gnu"
+            SANITIZERS="address thread leak memory"
+          elif [ "${{ matrix.os }}" = "macos-14" ]; then
+            TARGET="aarch64-apple-darwin"
+            # no memory and leak sanitizer support yet
+            SANITIZERS="address thread"
+          fi
+
+          for sanitizer in $SANITIZERS; do
+            echo "Running tests with $sanitizer sanitizer..."
+            RUSTFLAGS="-Z sanitizer=$sanitizer" cargo +nightly test -Z build-std --target $TARGET
+          done
 
       - name: Check formatting
         run: |
