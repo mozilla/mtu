@@ -88,7 +88,7 @@ jobs:
 
           for sanitizer in $SANITIZERS; do
             echo "Running tests with $sanitizer sanitizer..."
-            RUSTFLAGS="-Z sanitizer=$sanitizer" cargo +nightly test -Z build-std --target $TARGET
+            RUSTFLAGS="-Z sanitizer=$sanitizer" RUSTDOCFLAGS="-Z sanitizer=$sanitizer" cargo +nightly test -Z build-std --target $TARGET
           done
 
       - name: Check formatting
