@@ -162,7 +162,7 @@ fn get_interface_mtu_linux_macos(socket: &UdpSocket) -> Result<usize, Error> {
 
 #[cfg(target_os = "windows")]
 fn get_interface_mtu_windows(socket: &UdpSocket) -> Result<usize, Error> {
-    use std::{cmp::min, ffi::c_void, slice};
+    use std::{ffi::c_void, slice};
 
     use windows::Win32::{
         Foundation::NO_ERROR,
@@ -214,8 +214,7 @@ fn get_interface_mtu_windows(socket: &UdpSocket) -> Result<usize, Error> {
                     // For the matching address, find local interface and its MTU.
                     for iface in ifaces {
                         if iface.InterfaceIndex == addr.InterfaceIndex {
-                            // On loopback, the MTU is 4294967295...
-                            res = min(iface.NlMtu, 65536).try_into().or(res);
+                            res = iface.NlMtutry_into().or(res);
                             break 'addr_loop;
                         }
                     }
