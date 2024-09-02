@@ -263,9 +263,9 @@ mod test {
         #[cfg(target_os = "macos")]
         check_mtu("localhost:443", true, 16384);
         #[cfg(target_os = "linux")]
-        check_mtu("localhost:443", false, 65536);
+        check_mtu("localhost:443", false, 65_536);
         #[cfg(target_os = "windows")]
-        check_mtu("localhost:443", false, 4294967295);
+        check_mtu("localhost:443", false, 4_294_967_295);
     }
 
     #[test]
@@ -273,9 +273,9 @@ mod test {
         #[cfg(target_os = "macos")]
         check_mtu("localhost:443", false, 16384);
         #[cfg(target_os = "linux")]
-        check_mtu("localhost:443", false, 65536);
+        check_mtu("localhost:443", false, 65_536);
         #[cfg(target_os = "windows")]
-        check_mtu("localhost:443", false, 4294967295);
+        check_mtu("localhost:443", false, 4_294_967_295);
     }
 
     #[test]
