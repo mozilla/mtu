@@ -31,9 +31,10 @@ fn default_result<T>() -> Result<T, Error> {
 ///
 /// ```
 /// use std::net::ToSocketAddrs;
+///
 /// use mtu::get_interface_mtu;
 ///
-/// let saddr ="localhost:443".to_socket_addrs().unwrap().next().unwrap();
+/// let saddr = "localhost:443".to_socket_addrs().unwrap().next().unwrap();
 /// let mtu = get_interface_mtu(&saddr).unwrap();
 /// println!("MTU towards {:?} is {}", saddr, mtu);
 /// ```
