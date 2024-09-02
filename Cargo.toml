@@ -1,0 +1,34 @@
+[package]
+name = "mtu"
+description = "Obtain the local network interface MTU towards a given IP address."
+keywords = ["mozilla", "interface", "mtu"]
+categories = ["network-programming", "web-programming"]
+homepage = "https://github.com/mozilla/mtu/"
+repository = "https://github.com/mozilla/mtu/"
+authors = ["The Mozilla Necko Team <necko@mozilla.com>"]
+readme = "README.md"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+# Don't increase beyond what Firefox is currently using:
+# https://searchfox.org/mozilla-central/search?q=MINIMUM_RUST_VERSION&path=python/mozboot/mozboot/util.py
+# Also keep in sync with .github/workflows/check.yml
+rust-version = "1.76.0"
+
+[dependencies]
+# Don't increase beyond what Firefox is currently using: https://searchfox.org/mozilla-central/source/Cargo.lock
+libc = { version = "0.2", default-features = false }
+log = { version = "0.4", default-features = false }
+
+[target."cfg(windows)".dependencies]
+# Don't increase beyond what Firefox is currently using: https://searchfox.org/mozilla-central/source/Cargo.lock
+windows = { version = "0.58", default-features = false, features = [
+        "Win32_NetworkManagement_IpHelper",
+        "Win32_NetworkManagement_Ndis",
+        "Win32_Networking_WinSock",
+] }
+
+[lints.clippy]
+cargo = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
