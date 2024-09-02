@@ -162,7 +162,7 @@ fn get_interface_mtu_linux_macos(socket: &UdpSocket) -> Result<usize, Error> {
 
 #[cfg(target_os = "windows")]
 fn get_interface_mtu_windows(socket: &UdpSocket) -> Result<usize, Error> {
-    use std::{cmp::min, ffi::c_void, slice};
+    use std::{ffi::c_void, slice};
 
     use windows::Win32::{
         Foundation::NO_ERROR,
@@ -214,8 +214,7 @@ fn get_interface_mtu_windows(socket: &UdpSocket) -> Result<usize, Error> {
                     // For the matching address, find local interface and its MTU.
                     for iface in ifaces {
                         if iface.InterfaceIndex == addr.InterfaceIndex {
-                            // On loopback, the MTU is 4294967295...
-                            res = min(iface.NlMtu, 65536).try_into().or(res);
+                            res = iface.NlMtu.try_into().or(res);
                             break 'addr_loop;
                         }
                     }
@@ -263,16 +262,20 @@ mod test {
     fn loopback_interface_mtu_v4() {
         #[cfg(target_os = "macos")]
         check_mtu("localhost:443", true, 16384);
-        #[cfg(not(target_os = "macos"))]
-        check_mtu("localhost:443", true, 65536);
+        #[cfg(target_os = "linux")]
+        check_mtu("localhost:443", false, 65_536);
+        #[cfg(target_os = "windows")]
+        check_mtu("localhost:443", false, 4_294_967_295);
     }
 
     #[test]
     fn loopback_interface_mtu_v6() {
         #[cfg(target_os = "macos")]
         check_mtu("localhost:443", false, 16384);
-        #[cfg(not(target_os = "macos"))]
-        check_mtu("localhost:443", false, 65536);
+        #[cfg(target_os = "linux")]
+        check_mtu("localhost:443", false, 65_536);
+        #[cfg(target_os = "windows")]
+        check_mtu("localhost:443", false, 4_294_967_295);
     }
 
     #[test]
