@@ -270,8 +270,10 @@ mod test {
     fn loopback_interface_mtu_v6() {
         #[cfg(target_os = "macos")]
         check_mtu("localhost:443", false, 16384);
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(target_os = "linux")]
         check_mtu("localhost:443", false, 65536);
+        #[cfg(target_os = "windows")]
+        check_mtu("localhost:443", false, 4294967295);
     }
 
     #[test]
