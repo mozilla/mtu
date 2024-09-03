@@ -20,7 +20,7 @@ fn default_result<T>() -> Result<T, Error> {
     ))
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum SocketAddrs {
     Local(SocketAddr),
     Remote(SocketAddr),
@@ -56,7 +56,7 @@ impl From<(SocketAddr, Option<SocketAddr>)> for SocketAddrs {
 ///
 /// ```
 /// let saddr = "127.0.0.1:443".parse().unwrap();
-/// let mtu = mtu::interface_mtu(mtu::SocketAddrs::Remote(saddr)).unwrap();
+/// let mtu = mtu::interface_mtu((None, saddr)).unwrap();
 /// println!("MTU for {saddr:?} is {mtu}");
 /// ```
 ///
@@ -104,14 +104,14 @@ where
         }
     }
 
-    trace!("MTU for {:?} is {res:?}", addrs);
+    trace!("MTU for {addrs:?} is {res:?}");
     res
 }
 
 #[doc(hidden)]
 #[deprecated(since = "0.1.2", note = "Use `interface_mtu()` instead")]
 pub fn get_interface_mtu(remote: &SocketAddr) -> Result<usize, Error> {
-    interface_mtu(SocketAddrs::Remote(*remote))
+    interface_mtu((None, *remote))
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
@@ -292,60 +292,125 @@ fn interface_mtu_windows(socket: &UdpSocket) -> Result<usize, Error> {
 
 #[cfg(test)]
 mod test {
-    use std::net::ToSocketAddrs;
+    use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6, ToSocketAddrs};
 
-    use log::warn;
+    use crate::interface_mtu;
 
-    use crate::SocketAddrs;
+    cfg_if::cfg_if! {
+        if #[cfg(target_os = "macos")] {const LOCAL_MTU: usize = 16_384;}
+        else if #[cfg(target_os = "linux")] {const LOCAL_MTU: usize = 65_536;}
+        else if #[cfg(target_os = "windows")] { const LOCAL_MTU: usize = 4_294_967_295;}
+        else { panic!("Unsupported platform"); }
+    }
 
-    fn check_mtu(sockaddr: &str, ipv4: bool, expected: usize) {
-        let addr = sockaddr
+    const INET_MTU: usize = 1500;
+
+    //  The tests can run in parallel, so make sure to use different ports for all the tests.
+    const fn local_v4(port: u16) -> SocketAddr {
+        SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, port))
+    }
+
+    const fn local_v6(port: u16) -> SocketAddr {
+        SocketAddr::V6(SocketAddrV6::new(Ipv6Addr::LOCALHOST, port, 0, 0))
+    }
+
+    fn inet_v4(port: u16) -> SocketAddr {
+        format!("ietf.org:{port}")
             .to_socket_addrs()
             .unwrap()
-            .find(|a| a.is_ipv4() == ipv4);
-        if let Some(addr) = addr {
-            match super::interface_mtu(SocketAddrs::Remote(addr)) {
-                Ok(mtu) => assert_eq!(mtu, expected),
-                Err(e) => {
-                    // Some GitHub runners don't have IPv6. Just warn if we can't get the MTU.
-                    assert!(addr.is_ipv6());
-                    warn!("Error getting MTU for {sockaddr}: {e}");
-                }
-            }
-        } else {
-            // Some GitHub runners don't have IPv6. Just warn if we can't get an IPv6 address.
-            assert!(!ipv4);
-            warn!("No IPv6 address found for {sockaddr}");
-        }
+            .find(SocketAddr::is_ipv4)
+            .unwrap()
+    }
+
+    fn inet_v6(port: u16) -> SocketAddr {
+        format!("ietf.org:{port}")
+            .to_socket_addrs()
+            .unwrap()
+            .find(SocketAddr::is_ipv4)
+            .unwrap()
     }
 
     #[test]
-    fn loopback_interface_mtu_v4() {
-        #[cfg(target_os = "macos")]
-        check_mtu("localhost:443", true, 16384);
-        #[cfg(target_os = "linux")]
-        check_mtu("localhost:443", false, 65_536);
-        #[cfg(target_os = "windows")]
-        check_mtu("localhost:443", false, 4_294_967_295);
+    fn loopback_v4_loopback_v4() {
+        assert_eq!(
+            interface_mtu((local_v4(1234), local_v4(1235))).unwrap(),
+            LOCAL_MTU
+        );
     }
 
     #[test]
-    fn loopback_interface_mtu_v6() {
-        #[cfg(target_os = "macos")]
-        check_mtu("localhost:443", false, 16384);
-        #[cfg(target_os = "linux")]
-        check_mtu("localhost:443", false, 65_536);
-        #[cfg(target_os = "windows")]
-        check_mtu("localhost:443", false, 4_294_967_295);
+    fn loopback_v4_loopback_v6() {
+        assert!(interface_mtu((local_v4(1236), local_v6(4323))).is_err());
     }
 
     #[test]
-    fn default_interface_mtu_v4() {
-        check_mtu("ietf.org:443", true, 1500);
+    fn loopback_v6_loopback_v4() {
+        assert!(interface_mtu((local_v6(4324), local_v4(1237))).is_err());
     }
 
     #[test]
-    fn default_interface_mtu_v6() {
-        check_mtu("ietf.org:443", false, 1500);
+    fn loopback_v6_loopback_v6() {
+        assert_eq!(
+            interface_mtu((local_v6(4321), local_v6(4322))).unwrap(),
+            LOCAL_MTU
+        );
+    }
+    #[test]
+    fn none_loopback_v4() {
+        assert_eq!(interface_mtu((None, local_v4(1238))).unwrap(), LOCAL_MTU);
+    }
+
+    #[test]
+    fn none_loopback_v6() {
+        assert_eq!(interface_mtu((None, local_v6(4325))).unwrap(), LOCAL_MTU);
+    }
+
+    #[test]
+    fn loopback_v4_none() {
+        assert_eq!(interface_mtu((local_v4(1239), None)).unwrap(), LOCAL_MTU);
+    }
+
+    #[test]
+    fn loopback_v6_none() {
+        assert_eq!(interface_mtu((local_v6(4326), None)).unwrap(), LOCAL_MTU);
+    }
+
+    #[test]
+    fn inet_v4_inet_v4() {
+        assert!(interface_mtu((inet_v4(2234), inet_v4(2235))).is_err());
+    }
+
+    #[test]
+    fn inet_v4_inet_v6() {
+        assert!(interface_mtu((inet_v4(2236), inet_v6(5323))).is_err());
+    }
+
+    #[test]
+    fn inet_v6_inet_v4() {
+        assert!(interface_mtu((inet_v6(5324), inet_v4(2237))).is_err());
+    }
+
+    #[test]
+    fn inet_v6_inet_v6() {
+        assert!(interface_mtu((inet_v6(5321), inet_v6(5322))).is_err());
+    }
+    #[test]
+    fn none_inet_v4() {
+        assert_eq!(interface_mtu((None, inet_v4(2238))).unwrap(), INET_MTU);
+    }
+
+    #[test]
+    fn none_inet_v6() {
+        assert_eq!(interface_mtu((None, inet_v6(5325))).unwrap(), INET_MTU);
+    }
+
+    #[test]
+    fn inet_v4_none() {
+        assert!(interface_mtu((inet_v4(2239), None)).is_err());
+    }
+
+    #[test]
+    fn inet_v6_none() {
+        assert!(interface_mtu((inet_v6(5326), None)).is_err());
     }
 }

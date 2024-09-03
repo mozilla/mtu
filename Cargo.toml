@@ -28,6 +28,9 @@ windows = { version = "0.58", default-features = false, features = [
         "Win32_Networking_WinSock",
 ] }
 
+[dev-dependencies]
+cfg-if = { version = "1.0", default-features = false }
+
 [lints.clippy]
 cargo = { level = "warn", priority = -1 }
 nursery = { level = "warn", priority = -1 }
