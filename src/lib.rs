@@ -190,7 +190,7 @@ fn get_interface_and_mtu_linux_macos(socket: &UdpSocket) -> Result<(InterfaceId,
 }
 
 #[cfg(target_os = "windows")]
-fn get_interface_mtu_windows(socket: &UdpSocket) -> Result<(InterfaceId, usize), Error> {
+fn get_interface_and_mtu_windows(socket: &UdpSocket) -> Result<(InterfaceId, usize), Error> {
     use std::{
         ffi::c_void,
         hash::{DefaultHasher, Hasher},
