@@ -191,7 +191,11 @@ fn get_interface_and_mtu_linux_macos(socket: &UdpSocket) -> Result<(InterfaceId,
 
 #[cfg(target_os = "windows")]
 fn get_interface_mtu_windows(socket: &UdpSocket) -> Result<(InterfaceId, usize), Error> {
-    use std::{ffi::c_void, hash::DefaultHasher, slice};
+    use std::{
+        ffi::c_void,
+        hash::{DefaultHasher, Hasher},
+        slice,
+    };
 
     use windows::Win32::{
         Foundation::NO_ERROR,
@@ -250,7 +254,7 @@ fn get_interface_mtu_windows(socket: &UdpSocket) -> Result<(InterfaceId, usize),
             // For the matching address, find local interface and its MTU.
             for iface in ifaces {
                 if iface.InterfaceIndex == addr.InterfaceIndex {
-                    if Ok(mtu) = iface.NlMtu.try_into() {
+                    if let Ok(mtu) = iface.NlMtu.try_into() {
                         let mut hasher = DefaultHasher::new();
                         iface.InterfaceIndex.hash(&mut hasher);
                         let id = hasher.finish();
