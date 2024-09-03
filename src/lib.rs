@@ -331,4 +331,12 @@ mod test {
     fn default_interface_mtu_v6() {
         check_mtu("ietf.org:443", false, 1500);
     }
+
+    #[test]
+    #[allow(deprecated)] // Purpose of the test is to cover deprecated functions.
+    fn deprecated_functions() {
+        let addr = "localhost:443".to_socket_addrs().unwrap().next().unwrap();
+        assert!(super::interface_mtu(&addr).is_ok());
+        assert!(super::get_interface_mtu(&addr).is_ok());
+    }
 }
