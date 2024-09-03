@@ -250,8 +250,8 @@ fn interface_and_mtu_windows(socket: &UdpSocket) -> Result<(String, usize), Erro
             for iface in ifaces {
                 if iface.InterfaceIndex == addr.InterfaceIndex {
                     if let Ok(mtu) = iface.NlMtu.try_into() {
-                        let name: [u8; 256]; // IF_NAMESIZE not available?
-                        if !if_indextoname(iface.InterfaceIndex, &mut name).is_null() {
+                        let name = [0u8; 256]; // IF_NAMESIZE not available?
+                        if unsafe { !if_indextoname(iface.InterfaceIndex, &mut name).is_null() } {
                             if let Ok(name) = str::from_utf8(&name) {
                                 res = Ok((name.to_string(), mtu));
                             }
