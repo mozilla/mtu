@@ -32,7 +32,7 @@ fn default_result<T>() -> Result<T, Error> {
 /// ```
 /// let saddr = "127.0.0.1:443".parse().unwrap();
 /// let mtu = mtu::interface_mtu(&saddr).unwrap();
-/// println!("MTU towards {:?} is {}", saddr, mtu);
+/// println!("MTU towards {saddr:?} is {mtu}");
 /// ```
 ///
 /// # Errors
@@ -68,7 +68,7 @@ pub fn interface_mtu(remote: &SocketAddr) -> Result<usize, Error> {
         }
     }
 
-    trace!("MTU towards {:?} is {:?}", remote, res);
+    trace!("MTU towards {remote:?} is {res:?}");
     res
 }
 
@@ -271,13 +271,13 @@ mod test {
                 Err(e) => {
                     // Some GitHub runners don't have IPv6. Just warn if we can't get the MTU.
                     assert!(addr.is_ipv6());
-                    warn!("Error getting MTU for {}: {}", sockaddr, e);
+                    warn!("Error getting MTU for {sockaddr}: {e}");
                 }
             }
         } else {
             // Some GitHub runners don't have IPv6. Just warn if we can't get an IPv6 address.
             assert!(!ipv4);
-            warn!("No IPv6 address found for {}", sockaddr);
+            warn!("No IPv6 address found for {sockaddr}");
         }
     }
 
