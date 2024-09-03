@@ -28,6 +28,9 @@ windows = { version = "0.58", default-features = false, features = [
         "Win32_Networking_WinSock",
 ] }
 
+[dev-dependencies]
+test-log = { version = "0.2", default-features = false, features = ["log"] }
+
 [lints.clippy]
 cargo = { level = "warn", priority = -1 }
 nursery = { level = "warn", priority = -1 }

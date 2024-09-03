@@ -259,6 +259,7 @@ mod test {
     use std::net::ToSocketAddrs;
 
     use log::warn;
+    use test_log::test;
 
     fn check_mtu(sockaddr: &str, ipv4: bool, expected: usize) {
         let addr = sockaddr
