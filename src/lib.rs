@@ -292,7 +292,10 @@ fn interface_mtu_windows(socket: &UdpSocket) -> Result<usize, Error> {
 
 #[cfg(test)]
 mod test {
-    use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6, ToSocketAddrs};
+    use std::{
+        net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6, ToSocketAddrs},
+        sync::atomic::AtomicU16,
+    };
 
     use crate::interface_mtu;
 
@@ -306,24 +309,30 @@ mod test {
     const INET_MTU: usize = 1500;
 
     //  The tests can run in parallel, so make sure to use different ports for all the tests.
-    const fn local_v4(port: u16) -> SocketAddr {
-        SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, port))
+    static PORT: AtomicU16 = AtomicU16::new(1234);
+
+    fn new_port() -> u16 {
+        PORT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     }
 
-    const fn local_v6(port: u16) -> SocketAddr {
-        SocketAddr::V6(SocketAddrV6::new(Ipv6Addr::LOCALHOST, port, 0, 0))
+    fn local_v4() -> SocketAddr {
+        SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, new_port()))
     }
 
-    fn inet_v4(port: u16) -> SocketAddr {
-        format!("ietf.org:{port}")
+    fn local_v6() -> SocketAddr {
+        SocketAddr::V6(SocketAddrV6::new(Ipv6Addr::LOCALHOST, new_port(), 0, 0))
+    }
+
+    fn inet_v4() -> SocketAddr {
+        format!("ietf.org:{}", new_port())
             .to_socket_addrs()
             .unwrap()
             .find(SocketAddr::is_ipv4)
             .unwrap()
     }
 
-    fn inet_v6(port: u16) -> SocketAddr {
-        format!("ietf.org:{port}")
+    fn inet_v6() -> SocketAddr {
+        format!("ietf.org:{}", new_port())
             .to_socket_addrs()
             .unwrap()
             .find(SocketAddr::is_ipv4)
@@ -332,85 +341,79 @@ mod test {
 
     #[test]
     fn loopback_v4_loopback_v4() {
-        assert_eq!(
-            interface_mtu((local_v4(1234), local_v4(1235))).unwrap(),
-            LOCAL_MTU
-        );
+        assert_eq!(interface_mtu((local_v4(), local_v4())).unwrap(), LOCAL_MTU);
     }
 
     #[test]
     fn loopback_v4_loopback_v6() {
-        assert!(interface_mtu((local_v4(1236), local_v6(4323))).is_err());
+        assert!(interface_mtu((local_v4(), local_v6())).is_err());
     }
 
     #[test]
     fn loopback_v6_loopback_v4() {
-        assert!(interface_mtu((local_v6(4324), local_v4(1237))).is_err());
+        assert!(interface_mtu((local_v6(), local_v4())).is_err());
     }
 
     #[test]
     fn loopback_v6_loopback_v6() {
-        assert_eq!(
-            interface_mtu((local_v6(4321), local_v6(4322))).unwrap(),
-            LOCAL_MTU
-        );
+        assert_eq!(interface_mtu((local_v6(), local_v6())).unwrap(), LOCAL_MTU);
     }
     #[test]
     fn none_loopback_v4() {
-        assert_eq!(interface_mtu((None, local_v4(1238))).unwrap(), LOCAL_MTU);
+        assert_eq!(interface_mtu((None, local_v4())).unwrap(), LOCAL_MTU);
     }
 
     #[test]
     fn none_loopback_v6() {
-        assert_eq!(interface_mtu((None, local_v6(4325))).unwrap(), LOCAL_MTU);
+        assert_eq!(interface_mtu((None, local_v6())).unwrap(), LOCAL_MTU);
     }
 
     #[test]
     fn loopback_v4_none() {
-        assert_eq!(interface_mtu((local_v4(1239), None)).unwrap(), LOCAL_MTU);
+        assert_eq!(interface_mtu((local_v4(), None)).unwrap(), LOCAL_MTU);
     }
 
     #[test]
     fn loopback_v6_none() {
-        assert_eq!(interface_mtu((local_v6(4326), None)).unwrap(), LOCAL_MTU);
+        assert_eq!(interface_mtu((local_v6(), None)).unwrap(), LOCAL_MTU);
     }
 
     #[test]
     fn inet_v4_inet_v4() {
-        assert!(interface_mtu((inet_v4(2234), inet_v4(2235))).is_err());
+        assert!(interface_mtu((inet_v4(), inet_v4())).is_err());
     }
 
     #[test]
     fn inet_v4_inet_v6() {
-        assert!(interface_mtu((inet_v4(2236), inet_v6(5323))).is_err());
+        assert!(interface_mtu((inet_v4(), inet_v6())).is_err());
     }
 
     #[test]
     fn inet_v6_inet_v4() {
-        assert!(interface_mtu((inet_v6(5324), inet_v4(2237))).is_err());
+        assert!(interface_mtu((inet_v6(), inet_v4())).is_err());
     }
 
     #[test]
     fn inet_v6_inet_v6() {
-        assert!(interface_mtu((inet_v6(5321), inet_v6(5322))).is_err());
+        assert!(interface_mtu((inet_v6(), inet_v6())).is_err());
     }
     #[test]
     fn none_inet_v4() {
-        assert_eq!(interface_mtu((None, inet_v4(2238))).unwrap(), INET_MTU);
+        assert_eq!(interface_mtu((None, inet_v4())).unwrap(), INET_MTU);
     }
 
     #[test]
     fn none_inet_v6() {
-        assert_eq!(interface_mtu((None, inet_v6(5325))).unwrap(), INET_MTU);
+        assert_eq!(interface_mtu((None, inet_v6())).unwrap(), INET_MTU);
     }
 
     #[test]
     fn inet_v4_none() {
-        assert!(interface_mtu((inet_v4(2239), None)).is_err());
+        assert!(interface_mtu((inet_v4(), None)).is_err());
     }
 
     #[test]
     fn inet_v6_none() {
-        assert!(interface_mtu((inet_v6(5326), None)).is_err());
+        assert!(interface_mtu((inet_v6(), None)).is_err());
     }
 }
