@@ -188,6 +188,7 @@ fn interface_and_mtu_linux_macos(socket: &UdpSocket) -> Result<(String, usize), 
 
 #[cfg(target_os = "windows")]
 fn interface_and_mtu_windows(socket: &UdpSocket) -> Result<(String, usize), Error> {
+    use core::str;
     use std::{ffi::c_void, slice};
 
     use windows::Win32::{
@@ -249,9 +250,11 @@ fn interface_and_mtu_windows(socket: &UdpSocket) -> Result<(String, usize), Erro
             for iface in ifaces {
                 if iface.InterfaceIndex == addr.InterfaceIndex {
                     if let Ok(mtu) = iface.NlMtu.try_into() {
-                        let name = String::with_capacity(256); // IF_NAMESIZE not available?
+                        let name: [u8; 256]; // IF_NAMESIZE not available?
                         if !if_indextoname(iface.InterfaceIndex, &mut name).is_null() {
-                            res = Ok((name, mtu));
+                            if let Ok(name) = str::from_utf8(&name) {
+                                res = Ok((name.to_string(), mtu));
+                            }
                         }
                     }
                     break 'addr_loop;
