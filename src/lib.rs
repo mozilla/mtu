@@ -56,8 +56,8 @@ impl From<(SocketAddr, Option<SocketAddr>)> for SocketAddrs {
 ///
 /// ```
 /// let saddr = "127.0.0.1:443".parse().unwrap();
-/// let mtu = mtu::interface_mtu(&saddr).unwrap();
-/// println!("MTU towards {saddr:?} is {mtu}");
+/// let mtu = mtu::interface_mtu(mtu::SocketAddrs::Remote(saddr)).unwrap();
+/// println!("MTU for {saddr:?} is {mtu}");
 /// ```
 ///
 /// # Errors
