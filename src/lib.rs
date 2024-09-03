@@ -74,12 +74,6 @@ pub fn interface_and_mtu(remote: &SocketAddr) -> Result<(String, usize), Error> 
     res
 }
 
-#[doc(hidden)]
-#[deprecated(since = "0.1.2", note = "Use `interface_mtu()` instead")]
-pub fn get_interface_mtu(remote: &SocketAddr) -> Result<usize, Error> {
-    interface_mtu(remote)
-}
-
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 fn interface_and_mtu_linux_macos(socket: &UdpSocket) -> Result<(String, usize), Error> {
     use std::ffi::{c_int, CStr};
@@ -269,28 +263,15 @@ fn interface_and_mtu_windows(socket: &UdpSocket) -> Result<(String, usize), Erro
     res
 }
 
-/// Return the maximum transmission unit (MTU) of the local network interface towards the
-/// destination [`SocketAddr`] given in `remote`.
-///
-/// The returned MTU may exceed the maximum IP packet size of 65,535 bytes on some
-/// platforms for some remote destinations. (For example, loopback destinations on
-/// Windows.)
-///
-/// This function is a convenience wrapper around [`interface_and_mtu`] that only returns the
-/// MTU. It is provided for compatibility with version 0.1 of the `mtu` crate.
-///
-/// # Examples
-///
-/// ```
-/// let saddr = "127.0.0.1:443".parse().unwrap();
-/// let mtu = mtu::interface_mtu(&saddr).unwrap();
-/// println!("MTU towards {saddr:?} is {mtu}");
-/// ```
-///
-/// # Errors
-///
-/// This function returns an error if the local interface MTU cannot be determined.
+#[doc(hidden)]
+#[deprecated(since = "0.1.2", note = "Use `interface_and_mtu()` instead")]
 pub fn interface_mtu(remote: &SocketAddr) -> Result<usize, Error> {
+    interface_and_mtu(remote).map(|(_, mtu)| mtu)
+}
+
+#[doc(hidden)]
+#[deprecated(since = "0.1.2", note = "Use `interface_and_mtu()` instead")]
+pub fn get_interface_mtu(remote: &SocketAddr) -> Result<usize, Error> {
     interface_and_mtu(remote).map(|(_, mtu)| mtu)
 }
 
@@ -306,8 +287,8 @@ mod test {
             .unwrap()
             .find(|a| a.is_ipv4() == ipv4);
         if let Some(addr) = addr {
-            match super::interface_mtu(&addr) {
-                Ok(mtu) => assert_eq!(mtu, expected),
+            match super::interface_and_mtu(&addr) {
+                Ok((_, mtu)) => assert_eq!(mtu, expected),
                 Err(e) => {
                     // Some GitHub runners don't have IPv6. Just warn if we can't get the MTU.
                     assert!(addr.is_ipv6());

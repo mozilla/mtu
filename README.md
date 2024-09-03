@@ -4,7 +4,7 @@ A crate to return the maximum transmission unit (MTU) of the local network inter
 
 ## Usage
 
-The main function exported by this crate is
+This crate exports a single function
 
 ```rust
 pub fn interface_and_mtu(remote: &SocketAddr) -> Result<(String, usize), Error>
