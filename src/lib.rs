@@ -253,6 +253,8 @@ fn interface_and_mtu_windows(socket: &UdpSocket) -> Result<(String, usize), Erro
                             if let Ok(name) = str::from_utf8(&name) {
                                 res = Ok((name.to_string(), mtu));
                             }
+                        } else {
+                            res = Err(Error::last_os_error());
                         }
                     }
                     break 'addr_loop;
