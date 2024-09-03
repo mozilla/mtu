@@ -244,7 +244,7 @@ fn get_interface_and_mtu_windows(socket: &UdpSocket) -> Result<(String, usize), 
                 if iface.InterfaceIndex == addr.InterfaceIndex {
                     if let Ok(mtu) = iface.NlMtu.try_into() {
                         let name = String::with_capacity(256); // IF_NAMESIZE not available?
-                        if !if_indextoname(iface.InterfaceIndex, &name).is_null() {
+                        if !if_indextoname(iface.InterfaceIndex, &mut name).is_null() {
                             res = Ok((name, mtu));
                         }
                     }
