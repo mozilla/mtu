@@ -273,14 +273,14 @@ fn interface_and_mtu_windows(socket: &UdpSocket) -> Result<(String, usize), Erro
 /// platforms for some remote destinations. (For example, loopback destinations on
 /// Windows.)
 ///
-/// This function is a convenience wrapper around [`get_interface_and_mtu`] that only returns the
+/// This function is a convenience wrapper around [`interface_and_mtu`] that only returns the
 /// MTU. It is provided for compatibility with version 0.1 of the `mtu` crate.
 ///
 /// # Examples
 ///
 /// ```
 /// let saddr = "127.0.0.1:443".parse().unwrap();
-/// let mtu = mtu::get_interface_mtu(&saddr).unwrap();
+/// let mtu = mtu::interface_mtu(&saddr).unwrap();
 /// println!("MTU towards {saddr:?} is {mtu}");
 /// ```
 ///
