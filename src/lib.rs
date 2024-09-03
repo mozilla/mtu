@@ -95,6 +95,12 @@ fn get_interface_and_mtu_linux_macos(socket: &UdpSocket) -> Result<(InterfaceId,
     #[cfg(target_os = "linux")]
     use libc::{ifreq, ioctl};
 
+    fn hash_interface_name(name: &str) -> InterfaceId {
+        let mut hasher = DefaultHasher::new();
+        name.hash(&mut hasher);
+        hasher.finish()
+    }
+
     // Get the interface list.
     let mut ifap: *mut ifaddrs = ptr::null_mut();
     if unsafe { getifaddrs(&mut ifap) } != 0 {
@@ -135,10 +141,6 @@ fn get_interface_and_mtu_linux_macos(socket: &UdpSocket) -> Result<(InterfaceId,
     // If we have found the interface name we are looking for, find the MTU.
     let mut res = default_result();
     if let Some(iface) = iface {
-        let mut hasher = DefaultHasher::new();
-        iface.hash(&mut hasher);
-        let id = hasher.finish();
-
         #[cfg(target_os = "macos")]
         {
             // On macOS, we need to loop again to find the MTU of that interface. We need to
@@ -161,7 +163,7 @@ fn get_interface_and_mtu_linux_macos(socket: &UdpSocket) -> Result<(InterfaceId,
                     {
                         let data = unsafe { &*(ifa.ifa_data as *const if_data) };
                         if let Ok(mtu) = usize::try_from(data.ifi_mtu) {
-                            res = Ok((id, mtu));
+                            res = Ok((hash_interface_name(iface), mtu));
                         }
                         break;
                     }
@@ -180,7 +182,7 @@ fn get_interface_and_mtu_linux_macos(socket: &UdpSocket) -> Result<(InterfaceId,
             if unsafe { ioctl(socket.as_raw_fd(), libc::SIOCGIFMTU, &ifr) } != 0 {
                 res = Err(Error::last_os_error());
             } else if let Ok(mtu) = usize::try_from(unsafe { ifr.ifr_ifru.ifru_mtu }) {
-                res = Ok((id, mtu));
+                res = Ok((hash_interface_name(iface), mtu));
             }
         }
     }
