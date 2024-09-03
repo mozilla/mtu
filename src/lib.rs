@@ -20,6 +20,31 @@ fn default_result<T>() -> Result<T, Error> {
     ))
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum SocketAddrs {
+    Local(SocketAddr),
+    Remote(SocketAddr),
+    Both((SocketAddr, SocketAddr)),
+}
+
+impl From<(SocketAddr, SocketAddr)> for SocketAddrs {
+    fn from((local, remote): (SocketAddr, SocketAddr)) -> Self {
+        Self::Both((local, remote))
+    }
+}
+
+impl From<(Option<SocketAddr>, SocketAddr)> for SocketAddrs {
+    fn from((local, remote): (Option<SocketAddr>, SocketAddr)) -> Self {
+        local.map_or(Self::Remote(remote), |local| Self::Both((local, remote)))
+    }
+}
+
+impl From<(SocketAddr, Option<SocketAddr>)> for SocketAddrs {
+    fn from((local, remote): (SocketAddr, Option<SocketAddr>)) -> Self {
+        remote.map_or(Self::Local(local), |remote| Self::Both((local, remote)))
+    }
+}
+
 /// Return the maximum transmission unit (MTU) of the local network interface towards the
 /// destination [`SocketAddr`] given in `remote`.
 ///
@@ -38,24 +63,35 @@ fn default_result<T>() -> Result<T, Error> {
 /// # Errors
 ///
 /// This function returns an error if the local interface MTU cannot be determined.
-pub fn interface_mtu(remote: &SocketAddr) -> Result<usize, Error> {
+pub fn interface_mtu<A>(addrs: A) -> Result<usize, Error>
+where
+    SocketAddrs: From<A>,
+    A: std::marker::Copy + std::fmt::Debug,
+{
     #[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
     #[allow(unused_assignments)] // Yes, res is reassigned in the platform-specific code.
     let mut res = default_result();
 
     #[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
     {
-        // Make a new socket that is connected to the remote address. We use this to learn which
-        // local address is chosen by routing.
-        let socket = UdpSocket::bind((
-            if remote.is_ipv4() {
-                IpAddr::V4(Ipv4Addr::UNSPECIFIED)
-            } else {
-                IpAddr::V6(Ipv6Addr::UNSPECIFIED)
-            },
-            0,
-        ))?;
-        socket.connect(remote)?;
+        let local = match addrs.into() {
+            SocketAddrs::Local(local) | SocketAddrs::Both((local, _)) => local,
+            SocketAddrs::Remote(remote) => SocketAddr::new(
+                if remote.is_ipv4() {
+                    IpAddr::V4(Ipv4Addr::UNSPECIFIED)
+                } else {
+                    IpAddr::V6(Ipv6Addr::UNSPECIFIED)
+                },
+                0,
+            ),
+        };
+        let socket = UdpSocket::bind(local)?;
+        match addrs.into() {
+            SocketAddrs::Local(_) => {}
+            SocketAddrs::Remote(remote) | SocketAddrs::Both((_, remote)) => {
+                socket.connect(remote)?;
+            }
+        }
 
         #[cfg(any(target_os = "macos", target_os = "linux"))]
         {
@@ -68,14 +104,14 @@ pub fn interface_mtu(remote: &SocketAddr) -> Result<usize, Error> {
         }
     }
 
-    trace!("MTU towards {remote:?} is {res:?}");
+    trace!("MTU for {:?} is {res:?}", addrs);
     res
 }
 
 #[doc(hidden)]
 #[deprecated(since = "0.1.2", note = "Use `interface_mtu()` instead")]
 pub fn get_interface_mtu(remote: &SocketAddr) -> Result<usize, Error> {
-    interface_mtu(remote)
+    interface_mtu(SocketAddrs::Remote(*remote))
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
@@ -260,13 +296,15 @@ mod test {
 
     use log::warn;
 
+    use crate::SocketAddrs;
+
     fn check_mtu(sockaddr: &str, ipv4: bool, expected: usize) {
         let addr = sockaddr
             .to_socket_addrs()
             .unwrap()
             .find(|a| a.is_ipv4() == ipv4);
         if let Some(addr) = addr {
-            match super::interface_mtu(&addr) {
+            match super::interface_mtu(SocketAddrs::Remote(addr)) {
                 Ok(mtu) => assert_eq!(mtu, expected),
                 Err(e) => {
                     // Some GitHub runners don't have IPv6. Just warn if we can't get the MTU.
