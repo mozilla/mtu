@@ -193,7 +193,7 @@ fn get_interface_and_mtu_linux_macos(socket: &UdpSocket) -> Result<(InterfaceId,
 fn get_interface_and_mtu_windows(socket: &UdpSocket) -> Result<(InterfaceId, usize), Error> {
     use std::{
         ffi::c_void,
-        hash::{DefaultHasher, Hasher},
+        hash::{DefaultHasher, Hash, Hasher},
         slice,
     };
 
