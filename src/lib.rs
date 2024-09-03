@@ -179,10 +179,8 @@ fn get_interface_and_mtu_linux_macos(socket: &UdpSocket) -> Result<(InterfaceId,
             });
             if unsafe { ioctl(socket.as_raw_fd(), libc::SIOCGIFMTU, &ifr) } != 0 {
                 res = Err(Error::last_os_error());
-            } else {
-                if let Ok(mtu) = usize::try_from(ifr.ifr_ifru.ifru_mtu) {
-                    res = Ok((id, mtu));
-                }
+            } else if let Ok(mtu) = usize::try_from(unsafe { ifr.ifr_ifru.ifru_mtu }) {
+                res = Ok((id, mtu));
             }
         }
     }
@@ -193,7 +191,7 @@ fn get_interface_and_mtu_linux_macos(socket: &UdpSocket) -> Result<(InterfaceId,
 
 #[cfg(target_os = "windows")]
 fn get_interface_mtu_windows(socket: &UdpSocket) -> Result<(InterfaceId, usize), Error> {
-    use std::{ffi::c_void, slice};
+    use std::{ffi::c_void, hash::DefaultHasher, slice};
 
     use windows::Win32::{
         Foundation::NO_ERROR,
