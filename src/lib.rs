@@ -35,14 +35,14 @@ fn default_result<T>() -> Result<(String, T), Error> {
 ///
 /// ```
 /// let saddr = "127.0.0.1:443".parse().unwrap();
-/// let (name, mtu) = mtu::get_interface_and_mtu(&saddr).unwrap();
+/// let (name, mtu) = mtu::interface_and_mtu(&saddr).unwrap();
 /// println!("MTU towards {saddr:?} is {mtu} on {name}");
 /// ```
 ///
 /// # Errors
 ///
 /// This function returns an error if the local interface MTU cannot be determined.
-pub fn get_interface_and_mtu(remote: &SocketAddr) -> Result<(String, usize), Error> {
+pub fn interface_and_mtu(remote: &SocketAddr) -> Result<(String, usize), Error> {
     #[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
     #[allow(unused_assignments)] // Yes, res is reassigned in the platform-specific code.
     let mut res = default_result();
@@ -63,21 +63,27 @@ pub fn get_interface_and_mtu(remote: &SocketAddr) -> Result<(String, usize), Err
 
         #[cfg(any(target_os = "macos", target_os = "linux"))]
         {
-            res = get_interface_and_mtu_linux_macos(&socket);
+            res = interface_and_mtu_linux_macos(&socket);
         }
 
         #[cfg(target_os = "windows")]
         {
-            res = get_interface_and_mtu_windows(&socket);
+            res = interface_and_mtu_windows(&socket);
         }
     }
 
-    trace!("MTU towards {:?} is {:?}", remote, res);
+    trace!("MTU towards {remote:?} is {res:?}");
     res
 }
 
+#[doc(hidden)]
+#[deprecated(since = "0.1.2", note = "Use `interface_mtu()` instead")]
+pub fn get_interface_mtu(remote: &SocketAddr) -> Result<usize, Error> {
+    interface_mtu(remote)
+}
+
 #[cfg(any(target_os = "macos", target_os = "linux"))]
-fn get_interface_and_mtu_linux_macos(socket: &UdpSocket) -> Result<(String, usize), Error> {
+fn interface_and_mtu_linux_macos(socket: &UdpSocket) -> Result<(String, usize), Error> {
     use std::ffi::{c_int, CStr};
     #[cfg(target_os = "linux")]
     use std::{ffi::c_char, mem, os::fd::AsRawFd};
@@ -181,7 +187,7 @@ fn get_interface_and_mtu_linux_macos(socket: &UdpSocket) -> Result<(String, usiz
 }
 
 #[cfg(target_os = "windows")]
-fn get_interface_and_mtu_windows(socket: &UdpSocket) -> Result<(String, usize), Error> {
+fn interface_and_mtu_windows(socket: &UdpSocket) -> Result<(String, usize), Error> {
     use std::{ffi::c_void, slice};
 
     use windows::Win32::{
@@ -281,8 +287,8 @@ fn get_interface_and_mtu_windows(socket: &UdpSocket) -> Result<(String, usize), 
 /// # Errors
 ///
 /// This function returns an error if the local interface MTU cannot be determined.
-pub fn get_interface_mtu(remote: &SocketAddr) -> Result<usize, Error> {
-    get_interface_and_mtu(remote).map(|(_, mtu)| mtu)
+pub fn interface_mtu(remote: &SocketAddr) -> Result<usize, Error> {
+    interface_and_mtu(remote).map(|(_, mtu)| mtu)
 }
 
 #[cfg(test)]
@@ -297,18 +303,18 @@ mod test {
             .unwrap()
             .find(|a| a.is_ipv4() == ipv4);
         if let Some(addr) = addr {
-            match super::get_interface_mtu(&addr) {
+            match super::interface_mtu(&addr) {
                 Ok(mtu) => assert_eq!(mtu, expected),
                 Err(e) => {
                     // Some GitHub runners don't have IPv6. Just warn if we can't get the MTU.
                     assert!(addr.is_ipv6());
-                    warn!("Error getting MTU for {}: {}", sockaddr, e);
+                    warn!("Error getting MTU for {sockaddr}: {e}");
                 }
             }
         } else {
             // Some GitHub runners don't have IPv6. Just warn if we can't get an IPv6 address.
             assert!(!ipv4);
-            warn!("No IPv6 address found for {}", sockaddr);
+            warn!("No IPv6 address found for {sockaddr}");
         }
     }
 

@@ -7,7 +7,7 @@ A crate to return the maximum transmission unit (MTU) of the local network inter
 The main function exported by this crate is
 
 ```rust
-pub fn get_interface_and_mtu(remote: &SocketAddr) -> Result<(InterfaceId, usize), Error>
+pub fn interface_and_mtu(remote: &SocketAddr) -> Result<(String, usize), Error>
 ```
 
 that returns an opaque identifier of the local network interface towards the `remote` destination together with its MTU, or an `Error` when the MTU could not be determined. It supports both IPv4 and IPv6.
