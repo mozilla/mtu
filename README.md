@@ -4,13 +4,13 @@ A crate to return the maximum transmission unit (MTU) of the local network inter
 
 ## Usage
 
-This crate exports a single function
+The main function exported by this crate is
 
 ```rust
-pub fn get_interface_mtu(remote: &SocketAddr) -> Result<usize, Error>
+pub fn get_interface_and_mtu(remote: &SocketAddr) -> Result<(InterfaceId, usize), Error>
 ```
 
-that returns the MTU of the local network interface towards the `remote` destination, or an `Error` when the MTU could not be determined. It supports both IPv4 and IPv6.
+that returns an opaque identifier of the local network interface towards the `remote` destination together with its MTU, or an `Error` when the MTU could not be determined. It supports both IPv4 and IPv6.
 
 ## Supported Platforms
 
@@ -21,6 +21,8 @@ that returns the MTU of the local network interface towards the `remote` destina
 ## Notes
 
 The returned MTU may exceed the maximum IP packet size of 65,535 bytes on some platforms for some remote destinations. (For example, loopback destinations on Windows.)
+
+The returned interface ID is an opaque identifier that can be used to identify the local interface. It is a hash of the interface name (on Linux and macOS) or interface index (on Windows), and has the same stability guarantees as those identifiers.
 
 ## Contributing
 

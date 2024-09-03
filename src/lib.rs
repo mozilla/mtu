@@ -13,32 +13,38 @@ use std::{
 use log::trace;
 
 /// Prepare a default error result.
-fn default_result<T>() -> Result<T, Error> {
+fn default_result<T>() -> Result<(InterfaceId, T), Error> {
     Err(Error::new(
         ErrorKind::NotFound,
         "Local interface MTU not found",
     ))
 }
 
-/// Return the maximum transmission unit (MTU) of the local network interface towards the
-/// destination [`SocketAddr`] given in `remote`.
+type InterfaceId = u64;
+
+/// Return a unique interface ID and the maximum transmission unit (MTU) of the local network
+/// interface towards the destination [`SocketAddr`] given in `remote`.
 ///
 /// The returned MTU may exceed the maximum IP packet size of 65,535 bytes on some
 /// platforms for some remote destinations. (For example, loopback destinations on
 /// Windows.)
 ///
+/// The returned interface ID is an opaque identifier that can be used to identify the local
+/// interface. It is a hash of the interface name (on Linux and macOS) or interface index (on
+/// Windows), and has the same stability guarantees as those identifiers.
+///
 /// # Examples
 ///
 /// ```
 /// let saddr = "127.0.0.1:443".parse().unwrap();
-/// let mtu = mtu::get_interface_mtu(&saddr).unwrap();
+/// let (id, mtu) = mtu::get_interface_and_mtu(&saddr).unwrap();
 /// println!("MTU towards {:?} is {}", saddr, mtu);
 /// ```
 ///
 /// # Errors
 ///
 /// This function returns an error if the local interface MTU cannot be determined.
-pub fn get_interface_mtu(remote: &SocketAddr) -> Result<usize, Error> {
+pub fn get_interface_and_mtu(remote: &SocketAddr) -> Result<(InterfaceId, usize), Error> {
     #[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
     #[allow(unused_assignments)] // Yes, res is reassigned in the platform-specific code.
     let mut res = default_result();
@@ -59,12 +65,12 @@ pub fn get_interface_mtu(remote: &SocketAddr) -> Result<usize, Error> {
 
         #[cfg(any(target_os = "macos", target_os = "linux"))]
         {
-            res = get_interface_mtu_linux_macos(&socket);
+            res = get_interface_and_mtu_linux_macos(&socket);
         }
 
         #[cfg(target_os = "windows")]
         {
-            res = get_interface_mtu_windows(&socket);
+            res = get_interface_and_mtu_windows(&socket);
         }
     }
 
@@ -73,10 +79,13 @@ pub fn get_interface_mtu(remote: &SocketAddr) -> Result<usize, Error> {
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
-fn get_interface_mtu_linux_macos(socket: &UdpSocket) -> Result<usize, Error> {
-    use std::ffi::{c_int, CStr};
+fn get_interface_and_mtu_linux_macos(socket: &UdpSocket) -> Result<(InterfaceId, usize), Error> {
     #[cfg(target_os = "linux")]
     use std::{ffi::c_char, mem, os::fd::AsRawFd};
+    use std::{
+        ffi::{c_int, CStr},
+        hash::{DefaultHasher, Hash, Hasher},
+    };
 
     use libc::{
         freeifaddrs, getifaddrs, ifaddrs, in_addr_t, sockaddr_in, sockaddr_in6, AF_INET, AF_INET6,
@@ -126,6 +135,10 @@ fn get_interface_mtu_linux_macos(socket: &UdpSocket) -> Result<usize, Error> {
     // If we have found the interface name we are looking for, find the MTU.
     let mut res = default_result();
     if let Some(iface) = iface {
+        let mut hasher = DefaultHasher::new();
+        iface.hash(&mut hasher);
+        let id = hasher.finish();
+
         #[cfg(target_os = "macos")]
         {
             // On macOS, we need to loop again to find the MTU of that interface. We need to
@@ -147,7 +160,9 @@ fn get_interface_mtu_linux_macos(socket: &UdpSocket) -> Result<usize, Error> {
                         && name == iface
                     {
                         let data = unsafe { &*(ifa.ifa_data as *const if_data) };
-                        res = usize::try_from(data.ifi_mtu).or(res);
+                        if let Ok(mtu) = usize::try_from(data.ifi_mtu) {
+                            res = Ok((id, mtu));
+                        }
                         break;
                     }
                 }
@@ -165,7 +180,9 @@ fn get_interface_mtu_linux_macos(socket: &UdpSocket) -> Result<usize, Error> {
             if unsafe { ioctl(socket.as_raw_fd(), libc::SIOCGIFMTU, &ifr) } != 0 {
                 res = Err(Error::last_os_error());
             } else {
-                res = unsafe { usize::try_from(ifr.ifr_ifru.ifru_mtu).or(res) };
+                if let Ok(mtu) = usize::try_from(ifr.ifr_ifru.ifru_mtu) {
+                    res = Ok((id, mtu));
+                }
             }
         }
     }
@@ -175,7 +192,7 @@ fn get_interface_mtu_linux_macos(socket: &UdpSocket) -> Result<usize, Error> {
 }
 
 #[cfg(target_os = "windows")]
-fn get_interface_mtu_windows(socket: &UdpSocket) -> Result<usize, Error> {
+fn get_interface_mtu_windows(socket: &UdpSocket) -> Result<(InterfaceId, usize), Error> {
     use std::{ffi::c_void, slice};
 
     use windows::Win32::{
@@ -235,7 +252,12 @@ fn get_interface_mtu_windows(socket: &UdpSocket) -> Result<usize, Error> {
             // For the matching address, find local interface and its MTU.
             for iface in ifaces {
                 if iface.InterfaceIndex == addr.InterfaceIndex {
-                    res = iface.NlMtu.try_into().or(res);
+                    if Ok(mtu) = iface.NlMtu.try_into() {
+                        let mut hasher = DefaultHasher::new();
+                        iface.InterfaceIndex.hash(&mut hasher);
+                        let id = hasher.finish();
+                        res = Ok((id, mtu));
+                    }
                     break 'addr_loop;
                 }
             }
@@ -246,6 +268,31 @@ fn get_interface_mtu_windows(socket: &UdpSocket) -> Result<usize, Error> {
     unsafe { FreeMibTable(addr_table as *const c_void) };
 
     res
+}
+
+/// Return the maximum transmission unit (MTU) of the local network interface towards the
+/// destination [`SocketAddr`] given in `remote`.
+///
+/// The returned MTU may exceed the maximum IP packet size of 65,535 bytes on some
+/// platforms for some remote destinations. (For example, loopback destinations on
+/// Windows.)
+///
+/// This function is a convenience wrapper around [`get_interface_and_mtu`] that only returns the
+/// MTU. It is provided for compatibility with version 0.1 of the `mtu` crate.
+///
+/// # Examples
+///
+/// ```
+/// let saddr = "127.0.0.1:443".parse().unwrap();
+/// let mtu = mtu::get_interface_mtu(&saddr).unwrap();
+/// println!("MTU towards {:?} is {}", saddr, mtu);
+/// ```
+///
+/// # Errors
+///
+/// This function returns an error if the local interface MTU cannot be determined.
+pub fn get_interface_mtu(remote: &SocketAddr) -> Result<usize, Error> {
+    get_interface_and_mtu(remote).map(|(_, mtu)| mtu)
 }
 
 #[cfg(test)]
