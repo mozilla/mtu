@@ -20,16 +20,14 @@ fn default_result<T>() -> Result<(String, T), Error> {
     ))
 }
 
-/// Return a unique interface ID and the maximum transmission unit (MTU) of the local network
+/// Return the interface name and the maximum transmission unit (MTU) of the local network
 /// interface towards the destination [`SocketAddr`] given in `remote`.
 ///
 /// The returned MTU may exceed the maximum IP packet size of 65,535 bytes on some
 /// platforms for some remote destinations. (For example, loopback destinations on
 /// Windows.)
 ///
-/// The returned interface ID is an opaque identifier that can be used to identify the local
-/// interface. It is a hash of the interface name (on Linux and macOS) or interface index (on
-/// Windows), and has the same stability guarantees as those identifiers.
+/// The returned interface name is obtained from the operating system.
 ///
 /// # Examples
 ///

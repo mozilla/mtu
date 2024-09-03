@@ -10,7 +10,7 @@ The main function exported by this crate is
 pub fn interface_and_mtu(remote: &SocketAddr) -> Result<(String, usize), Error>
 ```
 
-that returns an opaque identifier of the local network interface towards the `remote` destination together with its MTU, or an `Error` when the MTU could not be determined. It supports both IPv4 and IPv6.
+that returns the interface name and MTU of the local network interface used for transmission towards the `remote` destination, or an `Error` when the MTU could not be determined. It supports both IPv4 and IPv6.
 
 ## Supported Platforms
 
@@ -22,7 +22,7 @@ that returns an opaque identifier of the local network interface towards the `re
 
 The returned MTU may exceed the maximum IP packet size of 65,535 bytes on some platforms for some remote destinations. (For example, loopback destinations on Windows.)
 
-The returned interface ID is an opaque identifier that can be used to identify the local interface. It is a hash of the interface name (on Linux and macOS) or interface index (on Windows), and has the same stability guarantees as those identifiers.
+The returned interface name is obtained from the operating system.
 
 ## Contributing
 
