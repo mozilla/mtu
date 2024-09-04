@@ -5,6 +5,8 @@ on:
   pull_request:
     branches: ["main"]
   merge_group:
+  schedule:
+    - cron: "26 3 * * *" # 03:26 UTC
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1

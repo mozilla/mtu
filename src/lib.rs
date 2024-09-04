@@ -10,6 +10,11 @@ use std::{
     ptr,
 };
 
+// Though the module includes `allow(clippy::all)`, that doesn't seem to affect some lints
+#[allow(clippy::semicolon_if_nothing_returned, clippy::struct_field_names)]
+#[cfg(windows)]
+mod win_bindings;
+
 /// Prepare a default error result.
 fn default_result<T>() -> Result<T, Error> {
     Err(Error::new(
@@ -216,13 +221,10 @@ fn interface_mtu_impl(socket: &UdpSocket) -> Result<usize, Error> {
 fn interface_mtu_impl(socket: &UdpSocket) -> Result<usize, Error> {
     use std::{ffi::c_void, slice};
 
-    use windows::Win32::{
-        Foundation::NO_ERROR,
-        NetworkManagement::IpHelper::{
-            FreeMibTable, GetIpInterfaceTable, GetUnicastIpAddressTable, MIB_IPINTERFACE_ROW,
-            MIB_IPINTERFACE_TABLE, MIB_UNICASTIPADDRESS_ROW, MIB_UNICASTIPADDRESS_TABLE,
-        },
-        Networking::WinSock::{AF_INET, AF_INET6, AF_UNSPEC},
+    use win_bindings::{
+        FreeMibTable, GetIpInterfaceTable, GetUnicastIpAddressTable, AF_INET, AF_INET6, AF_UNSPEC,
+        MIB_IPINTERFACE_ROW, MIB_IPINTERFACE_TABLE, MIB_UNICASTIPADDRESS_ROW,
+        MIB_UNICASTIPADDRESS_TABLE, NO_ERROR,
     };
 
     let mut res = default_result();
