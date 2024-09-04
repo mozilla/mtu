@@ -51,8 +51,13 @@ impl From<SocketAddr> for SocketAddrs {
     }
 }
 
-/// Return the maximum transmission unit (MTU) of the local network interface towards the
-/// destination [`SocketAddr`] given in `remote`.
+/// Given a pair of local and remote [`SocketAddr`]s, return the maximum transmission unit (MTU)
+/// of the local network interface used by a socket bound to the local address and connected
+/// towards the remote destination.
+///
+/// If the local address is `None`, the function will let the operating system choose the local
+/// address based on the given remote address. If the remote address is `None`, the function will
+/// return the MTU of the local network interface with the given local address.
 ///
 /// The returned MTU may exceed the maximum IP packet size of 65,535 bytes on some
 /// platforms for some remote destinations. (For example, loopback destinations on
