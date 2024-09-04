@@ -87,7 +87,7 @@ where
             ),
         };
         let socket = UdpSocket::bind(local)?;
-        match addrs.into() {
+        match addrs {
             SocketAddrs::Local(_) => {}
             SocketAddrs::Remote(remote) | SocketAddrs::Both((_, remote)) => {
                 socket.connect(remote)?;
