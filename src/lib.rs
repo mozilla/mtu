@@ -16,14 +16,14 @@ use std::{
 mod win_bindings;
 
 /// Prepare a default error result.
-fn default_result<T>() -> Result<T, Error> {
+fn default_result<T>() -> Result<(String, T), Error> {
     Err(Error::new(
         ErrorKind::NotFound,
         "Local interface MTU not found",
     ))
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum SocketAddrs {
     Local(SocketAddr),
     Remote(SocketAddr),
@@ -54,9 +54,9 @@ impl From<SocketAddr> for SocketAddrs {
     }
 }
 
-/// Given a pair of local and remote [`SocketAddr`]s, return the maximum transmission unit (MTU)
-/// of the local network interface used by a socket bound to the local address and connected
-/// towards the remote destination.
+/// Given a pair of local and remote [`SocketAddr`]s, return the name and maximum
+/// transmission unit (MTU) of the local network interface used by a socket bound to the local
+/// address and connected towards the remote destination.
 ///
 /// If the local address is `None`, the function will let the operating system choose the local
 /// address based on the given remote address. If the remote address is `None`, the function will
@@ -66,18 +66,20 @@ impl From<SocketAddr> for SocketAddrs {
 /// platforms for some remote destinations. (For example, loopback destinations on
 /// Windows.)
 ///
+/// The returned interface name is obtained from the operating system.
+///
 /// # Examples
 ///
 /// ```
 /// let saddr = "127.0.0.1:443".parse().unwrap();
-/// let mtu = mtu::interface_mtu((None, saddr)).unwrap();
-/// println!("MTU for {saddr:?} is {mtu}");
+/// let (name, mtu) = mtu::interface_and_mtu((None, saddr)).unwrap();
+/// println!("MTU towards {saddr:?} is {mtu} on {name}");
 /// ```
 ///
 /// # Errors
 ///
 /// This function returns an error if the local interface MTU cannot be determined.
-pub fn interface_mtu<A>(addrs: A) -> Result<usize, Error>
+pub fn interface_and_mtu<A>(addrs: A) -> Result<(String, usize), Error>
 where
     SocketAddrs: From<A>,
     A: std::marker::Copy + std::fmt::Debug,
@@ -101,22 +103,16 @@ where
             socket.connect(remote)?;
         }
     }
-    interface_mtu_impl(&socket)
-}
-
-#[doc(hidden)]
-#[deprecated(since = "0.1.2", note = "Use `interface_mtu()` instead")]
-pub fn get_interface_mtu(remote: &SocketAddr) -> Result<usize, Error> {
-    interface_mtu((None, *remote))
+    interface_and_mtu_impl(&socket)
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
-fn interface_mtu_impl(socket: &UdpSocket) -> Result<usize, Error> {
+fn interface_and_mtu_impl(socket: &UdpSocket) -> Result<usize, Error> {
     default_result()
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
-fn interface_mtu_impl(socket: &UdpSocket) -> Result<usize, Error> {
+fn interface_and_mtu_impl(socket: &UdpSocket) -> Result<(String, usize), Error> {
     use std::ffi::{c_int, CStr};
     #[cfg(target_os = "linux")]
     use std::{ffi::c_char, mem, os::fd::AsRawFd};
@@ -190,7 +186,9 @@ fn interface_mtu_impl(socket: &UdpSocket) -> Result<usize, Error> {
                         && name == iface
                     {
                         let data = unsafe { &*(ifa.ifa_data as *const if_data) };
-                        res = usize::try_from(data.ifi_mtu).or(res);
+                        if let Ok(mtu) = usize::try_from(data.ifi_mtu) {
+                            res = Ok((iface.to_string(), mtu));
+                        }
                         break;
                     }
                 }
@@ -207,8 +205,8 @@ fn interface_mtu_impl(socket: &UdpSocket) -> Result<usize, Error> {
             });
             if unsafe { ioctl(socket.as_raw_fd(), libc::SIOCGIFMTU, &ifr) } != 0 {
                 res = Err(Error::last_os_error());
-            } else {
-                res = unsafe { usize::try_from(ifr.ifr_ifru.ifru_mtu).or(res) };
+            } else if let Ok(mtu) = usize::try_from(unsafe { ifr.ifr_ifru.ifru_mtu }) {
+                res = Ok((iface.to_string(), mtu));
             }
         }
     }
@@ -218,12 +216,12 @@ fn interface_mtu_impl(socket: &UdpSocket) -> Result<usize, Error> {
 }
 
 #[cfg(target_os = "windows")]
-fn interface_mtu_impl(socket: &UdpSocket) -> Result<usize, Error> {
+fn interface_and_mtu_impl(socket: &UdpSocket) -> Result<(String, usize), Error> {
     use std::{ffi::c_void, slice};
 
     use win_bindings::{
-        FreeMibTable, GetIpInterfaceTable, GetUnicastIpAddressTable, AF_INET, AF_INET6, AF_UNSPEC,
-        MIB_IPINTERFACE_ROW, MIB_IPINTERFACE_TABLE, MIB_UNICASTIPADDRESS_ROW,
+        if_indextoname, FreeMibTable, GetIpInterfaceTable, GetUnicastIpAddressTable, AF_INET,
+        AF_INET6, AF_UNSPEC, MIB_IPINTERFACE_ROW, MIB_IPINTERFACE_TABLE, MIB_UNICASTIPADDRESS_ROW,
         MIB_UNICASTIPADDRESS_TABLE, NO_ERROR,
     };
 
@@ -275,7 +273,16 @@ fn interface_mtu_impl(socket: &UdpSocket) -> Result<usize, Error> {
             // For the matching address, find local interface and its MTU.
             for iface in ifaces {
                 if iface.InterfaceIndex == addr.InterfaceIndex {
-                    res = iface.NlMtu.try_into().or(res);
+                    if let Ok(mtu) = iface.NlMtu.try_into() {
+                        let mut name = [0u8; 256]; // IF_NAMESIZE not available?
+                        if unsafe { !if_indextoname(iface.InterfaceIndex, &mut name).is_null() } {
+                            if let Ok(name) = str::from_utf8(&name) {
+                                res = Ok((name.to_string(), mtu));
+                            }
+                        } else {
+                            res = Err(Error::last_os_error());
+                        }
+                    }
                     break 'addr_loop;
                 }
             }
@@ -288,6 +295,18 @@ fn interface_mtu_impl(socket: &UdpSocket) -> Result<usize, Error> {
     res
 }
 
+#[doc(hidden)]
+#[deprecated(since = "0.1.2", note = "Use `interface_and_mtu()` instead")]
+pub fn interface_mtu(remote: &SocketAddr) -> Result<usize, Error> {
+    interface_and_mtu(SocketAddrs::Remote(*remote)).map(|(_, mtu)| mtu)
+}
+
+#[doc(hidden)]
+#[deprecated(since = "0.1.2", note = "Use `interface_and_mtu()` instead")]
+pub fn get_interface_mtu(remote: &SocketAddr) -> Result<usize, Error> {
+    interface_and_mtu(SocketAddrs::Remote(*remote)).map(|(_, mtu)| mtu)
+}
+
 #[cfg(test)]
 mod test {
     use std::{
@@ -295,16 +314,30 @@ mod test {
         sync::atomic::AtomicU16,
     };
 
-    use crate::interface_mtu;
+    use crate::interface_and_mtu;
+
+    #[derive(Debug)]
+    struct NameMtu<'a>(Option<&'a str>, usize);
+
+    impl PartialEq<NameMtu<'_>> for (String, usize) {
+        fn eq(&self, other: &NameMtu<'_>) -> bool {
+            other.0.map_or(true, |name| name == self.0) && other.1 == self.1
+        }
+    }
 
     #[cfg(target_os = "macos")]
-    const LOCAL_MTU: usize = 16_384;
+    const LOOPBACK: NameMtu = NameMtu(Some("lo0"), 16_384);
     #[cfg(target_os = "linux")]
-    const LOCAL_MTU: usize = 65_536;
+    const LOOPBACK: NameMtu = NameMtu(Some("lo"), 65_536);
     #[cfg(target_os = "windows")]
-    const LOCAL_MTU: usize = 4_294_967_295;
+    const LOOPBACK: NameMtu = NameMtu(Some("lo0"), 4_294_967_295);
 
-    const INET_MTU: usize = 1500;
+    #[cfg(target_os = "macos")]
+    const INET: NameMtu = NameMtu(None, 1_500);
+    #[cfg(target_os = "linux")]
+    const INET: NameMtu = NameMtu(None, 1_500);
+    #[cfg(target_os = "windows")]
+    const INET: NameMtu = NameMtu(None, 1_500);
 
     //  The tests can run in parallel, so make sure to use different ports for all the tests.
     static PORT: AtomicU16 = AtomicU16::new(12345);
@@ -339,84 +372,87 @@ mod test {
 
     #[test]
     fn loopback_v4_loopback_v4() {
-        assert_eq!(interface_mtu((local_v4(), local_v4())).unwrap(), LOCAL_MTU);
+        assert!(interface_and_mtu((local_v4(), local_v4())).unwrap() == LOOPBACK);
     }
 
     #[test]
     fn loopback_v4_loopback_v6() {
-        assert!(interface_mtu((local_v4(), local_v6())).is_err());
+        assert!(interface_and_mtu((local_v4(), local_v6())).is_err());
     }
 
     #[test]
     fn loopback_v6_loopback_v4() {
-        assert!(interface_mtu((local_v6(), local_v4())).is_err());
+        assert!(interface_and_mtu((local_v6(), local_v4())).is_err());
     }
 
     #[test]
     fn loopback_v6_loopback_v6() {
-        assert_eq!(interface_mtu((local_v6(), local_v6())).unwrap(), LOCAL_MTU);
+        assert!(interface_and_mtu((local_v6(), local_v6())).unwrap() == LOOPBACK);
     }
     #[test]
     fn none_loopback_v4() {
-        assert_eq!(interface_mtu((None, local_v4())).unwrap(), LOCAL_MTU);
+        assert!(interface_and_mtu((None, local_v4())).unwrap() == LOOPBACK);
     }
 
     #[test]
     fn none_loopback_v6() {
-        assert_eq!(interface_mtu((None, local_v6())).unwrap(), LOCAL_MTU);
+        assert!(interface_and_mtu((None, local_v6())).unwrap() == LOOPBACK);
     }
 
     #[test]
     fn loopback_v4_none() {
-        assert_eq!(interface_mtu((local_v4(), None)).unwrap(), LOCAL_MTU);
+        assert!(interface_and_mtu((local_v4(), None)).unwrap() == LOOPBACK);
     }
 
     #[test]
     fn loopback_v6_none() {
-        assert_eq!(interface_mtu((local_v6(), None)).unwrap(), LOCAL_MTU);
+        assert!(interface_and_mtu((local_v6(), None)).unwrap() == LOOPBACK);
     }
 
     #[test]
     fn inet_v4_inet_v4() {
-        assert!(interface_mtu((inet_v4(), inet_v4())).is_err());
+        assert!(interface_and_mtu((inet_v4(), inet_v4())).is_err());
     }
 
     #[test]
     fn inet_v4_inet_v6() {
-        assert!(interface_mtu((inet_v4(), inet_v6())).is_err());
+        assert!(interface_and_mtu((inet_v4(), inet_v6())).is_err());
     }
 
     #[test]
     fn inet_v6_inet_v4() {
-        assert!(interface_mtu((inet_v6(), inet_v4())).is_err());
+        assert!(interface_and_mtu((inet_v6(), inet_v4())).is_err());
     }
 
     #[test]
     fn inet_v6_inet_v6() {
-        assert!(interface_mtu((inet_v6(), inet_v6())).is_err());
+        assert!(interface_and_mtu((inet_v6(), inet_v6())).is_err());
     }
     #[test]
     fn none_inet_v4() {
-        assert_eq!(interface_mtu((None, inet_v4())).unwrap(), INET_MTU);
+        assert!(interface_and_mtu((None, inet_v4())).unwrap() == INET);
     }
 
     #[test]
     fn none_inet_v6() {
-        assert_eq!(interface_mtu((None, inet_v6())).unwrap(), INET_MTU);
+        assert!(interface_and_mtu((None, inet_v6())).unwrap() == INET);
     }
 
     #[test]
     fn inet_v4_none() {
-        assert!(interface_mtu((inet_v4(), None)).is_err());
+        assert!(interface_and_mtu((inet_v4(), None)).is_err());
     }
 
     #[test]
     fn inet_v6_none() {
-        assert!(interface_mtu((inet_v6(), None)).is_err());
+        assert!(interface_and_mtu((inet_v6(), None)).is_err());
     }
 
     #[test]
-    fn compat() {
-        assert_eq!(interface_mtu(local_v4()).unwrap(), LOCAL_MTU);
+    #[allow(deprecated)] // Purpose of the test is to cover deprecated functions.
+    fn deprecated_functions() {
+        assert!(super::interface_mtu(&local_v4()).is_ok());
+        assert!(super::get_interface_mtu(&local_v4()).is_ok());
+        assert!(interface_and_mtu(local_v4()).is_ok());
     }
 }
