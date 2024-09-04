@@ -10,8 +10,6 @@ use std::{
     ptr,
 };
 
-use log::trace;
-
 /// Prepare a default error result.
 fn default_result<T>() -> Result<T, Error> {
     Err(Error::new(
@@ -79,45 +77,26 @@ where
     SocketAddrs: From<A>,
     A: std::marker::Copy + std::fmt::Debug,
 {
-    #[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
-    #[allow(unused_assignments)] // Yes, res is reassigned in the platform-specific code.
-    let mut res = default_result();
-
-    #[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
-    {
-        let addrs = SocketAddrs::from(addrs);
-        let local = match addrs {
-            SocketAddrs::Local(local) | SocketAddrs::Both((local, _)) => local,
-            SocketAddrs::Remote(remote) => SocketAddr::new(
-                if remote.is_ipv4() {
-                    IpAddr::V4(Ipv4Addr::UNSPECIFIED)
-                } else {
-                    IpAddr::V6(Ipv6Addr::UNSPECIFIED)
-                },
-                0,
-            ),
-        };
-        let socket = UdpSocket::bind(local)?;
-        match addrs {
-            SocketAddrs::Local(_) => {}
-            SocketAddrs::Remote(remote) | SocketAddrs::Both((_, remote)) => {
-                socket.connect(remote)?;
-            }
-        }
-
-        #[cfg(any(target_os = "macos", target_os = "linux"))]
-        {
-            res = interface_mtu_linux_macos(&socket);
-        }
-
-        #[cfg(target_os = "windows")]
-        {
-            res = interface_mtu_windows(&socket);
+    let addrs = SocketAddrs::from(addrs);
+    let local = match addrs {
+        SocketAddrs::Local(local) | SocketAddrs::Both((local, _)) => local,
+        SocketAddrs::Remote(remote) => SocketAddr::new(
+            if remote.is_ipv4() {
+                IpAddr::V4(Ipv4Addr::UNSPECIFIED)
+            } else {
+                IpAddr::V6(Ipv6Addr::UNSPECIFIED)
+            },
+            0,
+        ),
+    };
+    let socket = UdpSocket::bind(local)?;
+    match addrs {
+        SocketAddrs::Local(_) => {}
+        SocketAddrs::Remote(remote) | SocketAddrs::Both((_, remote)) => {
+            socket.connect(remote)?;
         }
     }
-
-    trace!("MTU for {addrs:?} is {res:?}");
-    res
+    interface_mtu_impl(&socket)
 }
 
 #[doc(hidden)]
@@ -126,8 +105,13 @@ pub fn get_interface_mtu(remote: &SocketAddr) -> Result<usize, Error> {
     interface_mtu((None, *remote))
 }
 
+#[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+fn interface_mtu_impl(socket: &UdpSocket) -> Result<usize, Error> {
+    default_result()
+}
+
 #[cfg(any(target_os = "macos", target_os = "linux"))]
-fn interface_mtu_linux_macos(socket: &UdpSocket) -> Result<usize, Error> {
+fn interface_mtu_impl(socket: &UdpSocket) -> Result<usize, Error> {
     use std::ffi::{c_int, CStr};
     #[cfg(target_os = "linux")]
     use std::{ffi::c_char, mem, os::fd::AsRawFd};
@@ -229,7 +213,7 @@ fn interface_mtu_linux_macos(socket: &UdpSocket) -> Result<usize, Error> {
 }
 
 #[cfg(target_os = "windows")]
-fn interface_mtu_windows(socket: &UdpSocket) -> Result<usize, Error> {
+fn interface_mtu_impl(socket: &UdpSocket) -> Result<usize, Error> {
     use std::{ffi::c_void, slice};
 
     use windows::Win32::{
