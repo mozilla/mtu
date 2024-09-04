@@ -19,6 +19,7 @@ fn codegen_windows_bindings() {
         "Windows.Win32.NetworkManagement.IpHelper.MIB_IPINTERFACE_TABLE",
         "Windows.Win32.NetworkManagement.IpHelper.MIB_UNICASTIPADDRESS_ROW",
         "Windows.Win32.NetworkManagement.IpHelper.MIB_UNICASTIPADDRESS_TABLE",
+        "Windows.Win32.NetworkManagement.IpHelper.if_indextoname",
         "Windows.Win32.Networking.WinSock.AF_INET",
         "Windows.Win32.Networking.WinSock.AF_INET6",
         "Windows.Win32.Networking.WinSock.AF_UNSPEC",

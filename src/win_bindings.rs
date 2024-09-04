@@ -28,6 +28,14 @@ pub unsafe fn GetUnicastIpAddressTable(
     windows_targets::link!("iphlpapi.dll" "system" fn GetUnicastIpAddressTable(family : ADDRESS_FAMILY, table : *mut *mut MIB_UNICASTIPADDRESS_TABLE) -> WIN32_ERROR);
     GetUnicastIpAddressTable(family, table)
 }
+#[inline]
+pub unsafe fn if_indextoname(
+    interfaceindex: u32,
+    interfacename: &mut [u8; 256],
+) -> windows_core::PSTR {
+    windows_targets::link!("iphlpapi.dll" "system" fn if_indextoname(interfaceindex : u32, interfacename : windows_core::PSTR) -> windows_core::PSTR);
+    if_indextoname(interfaceindex, core::mem::transmute(interfacename.as_ptr()))
+}
 #[repr(transparent)]
 #[derive(PartialEq, Eq, Copy, Clone, Default)]
 pub struct ADDRESS_FAMILY(pub u16);
