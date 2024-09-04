@@ -12,7 +12,7 @@ If the local address is `None`, the function will let the operating system choos
 
 ```rust
 let saddr = "127.0.0.1:443".parse().unwrap();
-let (name, mtu) = mtu::interface_and_mtu((None, saddr)).unwrap();
+let (name, mtu) = mtu::interface_and_mtu(&(None, saddr)).unwrap();
 println!("MTU for {saddr:?} is {mtu} on {name}");
 ```
 

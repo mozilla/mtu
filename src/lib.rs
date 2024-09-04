@@ -72,7 +72,7 @@ impl From<&SocketAddr> for SocketAddrs {
 ///
 /// ```
 /// let saddr = "127.0.0.1:443".parse().unwrap();
-/// let (name, mtu) = mtu::interface_and_mtu((None, saddr)).unwrap();
+/// let (name, mtu) = mtu::interface_and_mtu(&(None, saddr)).unwrap();
 /// println!("MTU towards {saddr:?} is {mtu} on {name}");
 /// ```
 ///
