@@ -189,8 +189,8 @@ fn interface_and_mtu_windows(socket: &UdpSocket) -> Result<(String, usize), Erro
     use std::{ffi::c_void, slice};
 
     use win_bindings::{
-        FreeMibTable, GetIpInterfaceTable, GetUnicastIpAddressTable, AF_INET, AF_INET6, AF_UNSPEC,
-        MIB_IPINTERFACE_ROW, MIB_IPINTERFACE_TABLE, MIB_UNICASTIPADDRESS_ROW,
+        if_indextoname, FreeMibTable, GetIpInterfaceTable, GetUnicastIpAddressTable, AF_INET,
+        AF_INET6, AF_UNSPEC, MIB_IPINTERFACE_ROW, MIB_IPINTERFACE_TABLE, MIB_UNICASTIPADDRESS_ROW,
         MIB_UNICASTIPADDRESS_TABLE, NO_ERROR,
     };
 
