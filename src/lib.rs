@@ -23,34 +23,34 @@ fn default_result<T>() -> Result<(String, T), Error> {
     ))
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub enum SocketAddrs {
     Local(SocketAddr),
     Remote(SocketAddr),
     Both((SocketAddr, SocketAddr)),
 }
 
-impl From<(SocketAddr, SocketAddr)> for SocketAddrs {
-    fn from((local, remote): (SocketAddr, SocketAddr)) -> Self {
-        Self::Both((local, remote))
+impl From<&(SocketAddr, SocketAddr)> for SocketAddrs {
+    fn from((local, remote): &(SocketAddr, SocketAddr)) -> Self {
+        Self::Both((*local, *remote))
     }
 }
 
-impl From<(Option<SocketAddr>, SocketAddr)> for SocketAddrs {
-    fn from((local, remote): (Option<SocketAddr>, SocketAddr)) -> Self {
-        local.map_or(Self::Remote(remote), |local| Self::Both((local, remote)))
+impl From<&(Option<SocketAddr>, SocketAddr)> for SocketAddrs {
+    fn from((local, remote): &(Option<SocketAddr>, SocketAddr)) -> Self {
+        local.map_or(Self::Remote(*remote), |local| Self::Both((local, *remote)))
     }
 }
 
-impl From<(SocketAddr, Option<SocketAddr>)> for SocketAddrs {
-    fn from((local, remote): (SocketAddr, Option<SocketAddr>)) -> Self {
-        remote.map_or(Self::Local(local), |remote| Self::Both((local, remote)))
+impl From<&(SocketAddr, Option<SocketAddr>)> for SocketAddrs {
+    fn from((local, remote): &(SocketAddr, Option<SocketAddr>)) -> Self {
+        remote.map_or(Self::Local(*local), |remote| Self::Both((*local, remote)))
     }
 }
 
-impl From<SocketAddr> for SocketAddrs {
-    fn from(local: SocketAddr) -> Self {
-        Self::Local(local)
+impl From<&SocketAddr> for SocketAddrs {
+    fn from(local: &SocketAddr) -> Self {
+        Self::Local(*local)
     }
 }
 
@@ -82,7 +82,6 @@ impl From<SocketAddr> for SocketAddrs {
 pub fn interface_and_mtu<A>(addrs: A) -> Result<(String, usize), Error>
 where
     SocketAddrs: From<A>,
-    A: std::marker::Copy + std::fmt::Debug,
 {
     let addrs = SocketAddrs::from(addrs);
     let local = match addrs {
@@ -391,65 +390,65 @@ mod test {
 
     #[test]
     fn loopback_v4_loopback_v4() {
-        assert!(interface_and_mtu((local_v4(), local_v4())).unwrap() == LOOPBACK);
+        assert!(interface_and_mtu(&(local_v4(), local_v4())).unwrap() == LOOPBACK);
     }
 
     #[test]
     fn loopback_v4_loopback_v6() {
-        assert!(interface_and_mtu((local_v4(), local_v6())).is_err());
+        assert!(interface_and_mtu(&(local_v4(), local_v6())).is_err());
     }
 
     #[test]
     fn loopback_v6_loopback_v4() {
-        assert!(interface_and_mtu((local_v6(), local_v4())).is_err());
+        assert!(interface_and_mtu(&(local_v6(), local_v4())).is_err());
     }
 
     #[test]
     fn loopback_v6_loopback_v6() {
-        assert!(interface_and_mtu((local_v6(), local_v6())).unwrap() == LOOPBACK);
+        assert!(interface_and_mtu(&(local_v6(), local_v6())).unwrap() == LOOPBACK);
     }
     #[test]
     fn none_loopback_v4() {
-        assert!(interface_and_mtu((None, local_v4())).unwrap() == LOOPBACK);
+        assert!(interface_and_mtu(&(None, local_v4())).unwrap() == LOOPBACK);
     }
 
     #[test]
     fn none_loopback_v6() {
-        assert!(interface_and_mtu((None, local_v6())).unwrap() == LOOPBACK);
+        assert!(interface_and_mtu(&(None, local_v6())).unwrap() == LOOPBACK);
     }
 
     #[test]
     fn loopback_v4_none() {
-        assert!(interface_and_mtu((local_v4(), None)).unwrap() == LOOPBACK);
+        assert!(interface_and_mtu(&(local_v4(), None)).unwrap() == LOOPBACK);
     }
 
     #[test]
     fn loopback_v6_none() {
-        assert!(interface_and_mtu((local_v6(), None)).unwrap() == LOOPBACK);
+        assert!(interface_and_mtu(&(local_v6(), None)).unwrap() == LOOPBACK);
     }
 
     #[test]
     fn inet_v4_inet_v4() {
-        assert!(interface_and_mtu((inet_v4(), inet_v4())).is_err());
+        assert!(interface_and_mtu(&(inet_v4(), inet_v4())).is_err());
     }
 
     #[test]
     fn inet_v4_inet_v6() {
-        assert!(interface_and_mtu((inet_v4(), inet_v6())).is_err());
+        assert!(interface_and_mtu(&(inet_v4(), inet_v6())).is_err());
     }
 
     #[test]
     fn inet_v6_inet_v4() {
-        assert!(interface_and_mtu((inet_v6(), inet_v4())).is_err());
+        assert!(interface_and_mtu(&(inet_v6(), inet_v4())).is_err());
     }
 
     #[test]
     fn inet_v6_inet_v6() {
-        assert!(interface_and_mtu((inet_v6(), inet_v6())).is_err());
+        assert!(interface_and_mtu(&(inet_v6(), inet_v6())).is_err());
     }
     #[test]
     fn none_inet_v4() {
-        assert!(interface_and_mtu((None, inet_v4())).unwrap() == INET);
+        assert!(interface_and_mtu(&(None, inet_v4())).unwrap() == INET);
     }
 
     #[test]
@@ -458,17 +457,17 @@ mod test {
             // The GitHub CI environment does not have IPv6 connectivity.
             return;
         }
-        assert!(interface_and_mtu((None, inet_v6())).unwrap() == INET);
+        assert!(interface_and_mtu(&(None, inet_v6())).unwrap() == INET);
     }
 
     #[test]
     fn inet_v4_none() {
-        assert!(interface_and_mtu((inet_v4(), None)).is_err());
+        assert!(interface_and_mtu(&(inet_v4(), None)).is_err());
     }
 
     #[test]
     fn inet_v6_none() {
-        assert!(interface_and_mtu((inet_v6(), None)).is_err());
+        assert!(interface_and_mtu(&(inet_v6(), None)).is_err());
     }
 
     #[test]
@@ -476,6 +475,6 @@ mod test {
     fn deprecated_functions() {
         assert!(super::interface_mtu(&local_v4()).is_ok());
         assert!(super::get_interface_mtu(&local_v4()).is_ok());
-        assert!(interface_and_mtu(local_v4()).is_ok());
+        assert!(interface_and_mtu(&local_v4()).is_ok());
     }
 }
