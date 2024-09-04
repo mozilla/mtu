@@ -300,12 +300,12 @@ mod test {
 
     use crate::interface_mtu;
 
-    cfg_if::cfg_if! {
-        if #[cfg(target_os = "macos")] {const LOCAL_MTU: usize = 16_384;}
-        else if #[cfg(target_os = "linux")] {const LOCAL_MTU: usize = 65_536;}
-        else if #[cfg(target_os = "windows")] { const LOCAL_MTU: usize = 4_294_967_295;}
-        else { panic!("Unsupported platform"); }
-    }
+    #[cfg(target_os = "macos")]
+    const LOCAL_MTU: usize = 16_384;
+    #[cfg(target_os = "linux")]
+    const LOCAL_MTU: usize = 65_536;
+    #[cfg(target_os = "windows")]
+    const LOCAL_MTU: usize = 4_294_967_295;
 
     const INET_MTU: usize = 1500;
 
