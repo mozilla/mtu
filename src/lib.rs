@@ -309,10 +309,9 @@ pub fn get_interface_mtu(remote: &SocketAddr) -> Result<usize, Error> {
 
 #[cfg(test)]
 mod test {
-    use std::{
-        net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6, ToSocketAddrs},
-        sync::atomic::AtomicU16,
-    };
+    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket};
+
+    use rand::Rng;
 
     use crate::interface_and_mtu;
 
@@ -340,35 +339,51 @@ mod test {
     #[cfg(target_os = "windows")]
     const INET: NameMtu = NameMtu(None, 1_500);
 
-    //  The tests can run in parallel, so make sure to use different ports for all the tests.
-    static PORT: AtomicU16 = AtomicU16::new(12345);
-
-    fn new_port() -> u16 {
-        PORT.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+    //  The tests can run in parallel, so try and find unused ports for all the tests.
+    fn socket_with_addr(local_ip: IpAddr) -> SocketAddr {
+        loop {
+            let port = rand::thread_rng().gen_range(1024..65535);
+            let socket = UdpSocket::bind(SocketAddr::new(local_ip, port));
+            match socket {
+                Ok(socket) => {
+                    if let Ok(saddr) = socket.local_addr() {
+                        // We found an unused port.
+                        return saddr;
+                    }
+                }
+                Err(e) => match e.kind() {
+                    std::io::ErrorKind::AddrInUse => {
+                        // We hit a used port, try again.
+                        continue;
+                    }
+                    _ => {
+                        // We hit another error. Pretend that worked by returning the socket
+                        // address, so the actual code can hit the same error.
+                        return SocketAddr::new(local_ip, port);
+                    }
+                },
+            }
+        }
     }
 
     fn local_v4() -> SocketAddr {
-        SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, new_port()))
+        socket_with_addr(IpAddr::V4(Ipv4Addr::LOCALHOST))
     }
 
     fn local_v6() -> SocketAddr {
-        SocketAddr::V6(SocketAddrV6::new(Ipv6Addr::LOCALHOST, new_port(), 0, 0))
+        socket_with_addr(IpAddr::V6(Ipv6Addr::LOCALHOST))
     }
 
     fn inet_v4() -> SocketAddr {
-        format!("ietf.org:{}", new_port())
-            .to_socket_addrs()
-            .unwrap()
-            .find(SocketAddr::is_ipv4)
-            .unwrap()
+        // cloudflare.com
+        socket_with_addr(IpAddr::V4(Ipv4Addr::new(104, 16, 132, 229)))
     }
 
     fn inet_v6() -> SocketAddr {
-        format!("ietf.org:{}", new_port())
-            .to_socket_addrs()
-            .unwrap()
-            .find(SocketAddr::is_ipv4)
-            .unwrap()
+        // cloudflare.com
+        socket_with_addr(IpAddr::V6(Ipv6Addr::new(
+            0x26, 0x06, 0x47, 0x00, 0x68, 0x10, 0x84, 0xe5,
+        )))
     }
 
     #[test]
