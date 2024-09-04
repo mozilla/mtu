@@ -310,10 +310,10 @@ mod test {
     const INET_MTU: usize = 1500;
 
     //  The tests can run in parallel, so make sure to use different ports for all the tests.
-    static PORT: AtomicU16 = AtomicU16::new(1234);
+    static PORT: AtomicU16 = AtomicU16::new(12345);
 
     fn new_port() -> u16 {
-        PORT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        PORT.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
     }
 
     fn local_v4() -> SocketAddr {
