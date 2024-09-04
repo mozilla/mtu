@@ -309,7 +309,10 @@ pub fn get_interface_mtu(remote: &SocketAddr) -> Result<usize, Error> {
 
 #[cfg(test)]
 mod test {
-    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket};
+    use std::{
+        env,
+        net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket},
+    };
 
     use rand::Rng;
 
@@ -451,6 +454,10 @@ mod test {
 
     #[test]
     fn none_inet_v6() {
+        if env::var("CI").is_ok() {
+            // The GitHub CI environment does not have IPv6 connectivity.
+            return;
+        }
         assert!(interface_and_mtu((None, inet_v6())).unwrap() == INET);
     }
 
