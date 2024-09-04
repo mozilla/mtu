@@ -332,6 +332,7 @@ mod test {
     #[cfg(target_os = "windows")]
     const LOOPBACK: NameMtu = NameMtu(Some("lo0"), 4_294_967_295);
 
+    // Non-loopback interface names are unpredictable, so we only check the MTU.
     #[cfg(target_os = "macos")]
     const INET: NameMtu = NameMtu(None, 1_500);
     #[cfg(target_os = "linux")]
@@ -454,13 +455,5 @@ mod test {
         assert!(super::interface_mtu(&local_v4()).is_ok());
         assert!(super::get_interface_mtu(&local_v4()).is_ok());
         assert!(interface_and_mtu(local_v4()).is_ok());
-    }
-
-    #[test]
-    #[allow(deprecated)] // Purpose of the test is to cover deprecated functions.
-    fn deprecated_functions() {
-        let addr = "localhost:443".to_socket_addrs().unwrap().next().unwrap();
-        assert!(super::interface_mtu(&addr).is_ok());
-        assert!(super::get_interface_mtu(&addr).is_ok());
     }
 }
