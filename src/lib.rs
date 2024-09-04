@@ -45,6 +45,12 @@ impl From<(SocketAddr, Option<SocketAddr>)> for SocketAddrs {
     }
 }
 
+impl From<SocketAddr> for SocketAddrs {
+    fn from(local: SocketAddr) -> Self {
+        Self::Local(local)
+    }
+}
+
 /// Return the maximum transmission unit (MTU) of the local network interface towards the
 /// destination [`SocketAddr`] given in `remote`.
 ///
@@ -416,5 +422,10 @@ mod test {
     #[test]
     fn inet_v6_none() {
         assert!(interface_mtu((inet_v6(), None)).is_err());
+    }
+
+    #[test]
+    fn compat() {
+        assert_eq!(interface_mtu(local_v4()).unwrap(), LOCAL_MTU);
     }
 }
