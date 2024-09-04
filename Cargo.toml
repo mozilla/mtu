@@ -22,11 +22,11 @@ log = { version = "0.4", default-features = false }
 
 [target."cfg(windows)".dependencies]
 # Don't increase beyond what Firefox is currently using: https://searchfox.org/mozilla-central/source/Cargo.lock
-windows = { version = "0.58", default-features = false, features = [
-        "Win32_NetworkManagement_IpHelper",
-        "Win32_NetworkManagement_Ndis",
-        "Win32_Networking_WinSock",
-] }
+windows-core = "0.58"
+windows-targets = "0.52"
+
+[target."cfg(windows)".dev-dependencies]
+windows-bindgen = { version = "0.58" } # MSRV is 1.70
 
 [lints.clippy]
 cargo = { level = "warn", priority = -1 }
