@@ -216,7 +216,10 @@ fn interface_and_mtu_impl(socket: &UdpSocket) -> Result<(String, usize), Error> 
 
 #[cfg(target_os = "windows")]
 fn interface_and_mtu_impl(socket: &UdpSocket) -> Result<(String, usize), Error> {
-    use std::{ffi::c_void, slice, str};
+    use std::{
+        ffi::{c_void, CStr},
+        slice,
+    };
 
     use win_bindings::{
         if_indextoname, FreeMibTable, GetIpInterfaceTable, GetUnicastIpAddressTable, AF_INET,
@@ -275,8 +278,10 @@ fn interface_and_mtu_impl(socket: &UdpSocket) -> Result<(String, usize), Error> 
                     if let Ok(mtu) = iface.NlMtu.try_into() {
                         let mut name = [0u8; 256]; // IF_NAMESIZE not available?
                         if unsafe { !if_indextoname(iface.InterfaceIndex, &mut name).is_null() } {
-                            if let Ok(name) = str::from_utf8(&name) {
-                                res = Ok((name.to_string(), mtu));
+                            if let Ok(name) = CStr::from_bytes_until_nul(&name) {
+                                if let Ok(name) = name.to_str() {
+                                    res = Ok((name.to_string(), mtu));
+                                }
                             }
                         } else {
                             res = Err(Error::last_os_error());
