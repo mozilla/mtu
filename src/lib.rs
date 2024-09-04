@@ -74,7 +74,8 @@ where
 
     #[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
     {
-        let local = match addrs.into() {
+        let addrs = SocketAddrs::from(addrs);
+        let local = match addrs {
             SocketAddrs::Local(local) | SocketAddrs::Both((local, _)) => local,
             SocketAddrs::Remote(remote) => SocketAddr::new(
                 if remote.is_ipv4() {
