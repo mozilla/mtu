@@ -332,7 +332,7 @@ mod test {
     #[cfg(target_os = "linux")]
     const LOOPBACK: NameMtu = NameMtu(Some("lo"), 65_536);
     #[cfg(target_os = "windows")]
-    const LOOPBACK: NameMtu = NameMtu(Some("lo0"), 4_294_967_295);
+    const LOOPBACK: NameMtu = NameMtu(Some("loopback_0"), 4_294_967_295);
 
     // Non-loopback interface names are unpredictable, so we only check the MTU.
     #[cfg(target_os = "macos")]
