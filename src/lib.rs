@@ -18,32 +18,34 @@ use log::trace;
 mod win_bindings;
 
 /// Prepare a default error result.
-fn default_result<T>() -> Result<T, Error> {
+fn default_result<T>() -> Result<(String, T), Error> {
     Err(Error::new(
         ErrorKind::NotFound,
         "Local interface MTU not found",
     ))
 }
 
-/// Return the maximum transmission unit (MTU) of the local network interface towards the
-/// destination [`SocketAddr`] given in `remote`.
+/// Return the interface name and the maximum transmission unit (MTU) of the local network
+/// interface towards the destination [`SocketAddr`] given in `remote`.
 ///
 /// The returned MTU may exceed the maximum IP packet size of 65,535 bytes on some
 /// platforms for some remote destinations. (For example, loopback destinations on
 /// Windows.)
 ///
+/// The returned interface name is obtained from the operating system.
+///
 /// # Examples
 ///
 /// ```
 /// let saddr = "127.0.0.1:443".parse().unwrap();
-/// let mtu = mtu::interface_mtu(&saddr).unwrap();
-/// println!("MTU towards {saddr:?} is {mtu}");
+/// let (name, mtu) = mtu::interface_and_mtu(&saddr).unwrap();
+/// println!("MTU towards {saddr:?} is {mtu} on {name}");
 /// ```
 ///
 /// # Errors
 ///
 /// This function returns an error if the local interface MTU cannot be determined.
-pub fn interface_mtu(remote: &SocketAddr) -> Result<usize, Error> {
+pub fn interface_and_mtu(remote: &SocketAddr) -> Result<(String, usize), Error> {
     #[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
     #[allow(unused_assignments)] // Yes, res is reassigned in the platform-specific code.
     let mut res = default_result();
@@ -64,12 +66,12 @@ pub fn interface_mtu(remote: &SocketAddr) -> Result<usize, Error> {
 
         #[cfg(any(target_os = "macos", target_os = "linux"))]
         {
-            res = interface_mtu_linux_macos(&socket);
+            res = interface_and_mtu_linux_macos(&socket);
         }
 
         #[cfg(target_os = "windows")]
         {
-            res = interface_mtu_windows(&socket);
+            res = interface_and_mtu_windows(&socket);
         }
     }
 
@@ -77,14 +79,8 @@ pub fn interface_mtu(remote: &SocketAddr) -> Result<usize, Error> {
     res
 }
 
-#[doc(hidden)]
-#[deprecated(since = "0.1.2", note = "Use `interface_mtu()` instead")]
-pub fn get_interface_mtu(remote: &SocketAddr) -> Result<usize, Error> {
-    interface_mtu(remote)
-}
-
 #[cfg(any(target_os = "macos", target_os = "linux"))]
-fn interface_mtu_linux_macos(socket: &UdpSocket) -> Result<usize, Error> {
+fn interface_and_mtu_linux_macos(socket: &UdpSocket) -> Result<(String, usize), Error> {
     use std::ffi::{c_int, CStr};
     #[cfg(target_os = "linux")]
     use std::{ffi::c_char, mem, os::fd::AsRawFd};
@@ -158,7 +154,9 @@ fn interface_mtu_linux_macos(socket: &UdpSocket) -> Result<usize, Error> {
                         && name == iface
                     {
                         let data = unsafe { &*(ifa.ifa_data as *const if_data) };
-                        res = usize::try_from(data.ifi_mtu).or(res);
+                        if let Ok(mtu) = usize::try_from(data.ifi_mtu) {
+                            res = Ok((iface.to_string(), mtu));
+                        }
                         break;
                     }
                 }
@@ -175,8 +173,8 @@ fn interface_mtu_linux_macos(socket: &UdpSocket) -> Result<usize, Error> {
             });
             if unsafe { ioctl(socket.as_raw_fd(), libc::SIOCGIFMTU, &ifr) } != 0 {
                 res = Err(Error::last_os_error());
-            } else {
-                res = unsafe { usize::try_from(ifr.ifr_ifru.ifru_mtu).or(res) };
+            } else if let Ok(mtu) = usize::try_from(unsafe { ifr.ifr_ifru.ifru_mtu }) {
+                res = Ok((iface.to_string(), mtu));
             }
         }
     }
@@ -186,12 +184,13 @@ fn interface_mtu_linux_macos(socket: &UdpSocket) -> Result<usize, Error> {
 }
 
 #[cfg(target_os = "windows")]
-fn interface_mtu_windows(socket: &UdpSocket) -> Result<usize, Error> {
+fn interface_and_mtu_windows(socket: &UdpSocket) -> Result<(String, usize), Error> {
+    use core::str;
     use std::{ffi::c_void, slice};
 
     use win_bindings::{
-        FreeMibTable, GetIpInterfaceTable, GetUnicastIpAddressTable, AF_INET, AF_INET6, AF_UNSPEC,
-        MIB_IPINTERFACE_ROW, MIB_IPINTERFACE_TABLE, MIB_UNICASTIPADDRESS_ROW,
+        if_indextoname, FreeMibTable, GetIpInterfaceTable, GetUnicastIpAddressTable, AF_INET,
+        AF_INET6, AF_UNSPEC, MIB_IPINTERFACE_ROW, MIB_IPINTERFACE_TABLE, MIB_UNICASTIPADDRESS_ROW,
         MIB_UNICASTIPADDRESS_TABLE, NO_ERROR,
     };
 
@@ -243,7 +242,16 @@ fn interface_mtu_windows(socket: &UdpSocket) -> Result<usize, Error> {
             // For the matching address, find local interface and its MTU.
             for iface in ifaces {
                 if iface.InterfaceIndex == addr.InterfaceIndex {
-                    res = iface.NlMtu.try_into().or(res);
+                    if let Ok(mtu) = iface.NlMtu.try_into() {
+                        let mut name = [0u8; 256]; // IF_NAMESIZE not available?
+                        if unsafe { !if_indextoname(iface.InterfaceIndex, &mut name).is_null() } {
+                            if let Ok(name) = str::from_utf8(&name) {
+                                res = Ok((name.to_string(), mtu));
+                            }
+                        } else {
+                            res = Err(Error::last_os_error());
+                        }
+                    }
                     break 'addr_loop;
                 }
             }
@@ -254,6 +262,18 @@ fn interface_mtu_windows(socket: &UdpSocket) -> Result<usize, Error> {
     unsafe { FreeMibTable(addr_table as *const c_void) };
 
     res
+}
+
+#[doc(hidden)]
+#[deprecated(since = "0.1.2", note = "Use `interface_and_mtu()` instead")]
+pub fn interface_mtu(remote: &SocketAddr) -> Result<usize, Error> {
+    interface_and_mtu(remote).map(|(_, mtu)| mtu)
+}
+
+#[doc(hidden)]
+#[deprecated(since = "0.1.2", note = "Use `interface_and_mtu()` instead")]
+pub fn get_interface_mtu(remote: &SocketAddr) -> Result<usize, Error> {
+    interface_and_mtu(remote).map(|(_, mtu)| mtu)
 }
 
 #[cfg(test)]
@@ -268,8 +288,8 @@ mod test {
             .unwrap()
             .find(|a| a.is_ipv4() == ipv4);
         if let Some(addr) = addr {
-            match super::interface_mtu(&addr) {
-                Ok(mtu) => assert_eq!(mtu, expected),
+            match super::interface_and_mtu(&addr) {
+                Ok((_, mtu)) => assert_eq!(mtu, expected),
                 Err(e) => {
                     // Some GitHub runners don't have IPv6. Just warn if we can't get the MTU.
                     assert!(addr.is_ipv6());
@@ -311,5 +331,13 @@ mod test {
     #[test]
     fn default_interface_mtu_v6() {
         check_mtu("ietf.org:443", false, 1500);
+    }
+
+    #[test]
+    #[allow(deprecated)] // Purpose of the test is to cover deprecated functions.
+    fn deprecated_functions() {
+        let addr = "localhost:443".to_socket_addrs().unwrap().next().unwrap();
+        assert!(super::interface_mtu(&addr).is_ok());
+        assert!(super::get_interface_mtu(&addr).is_ok());
     }
 }
