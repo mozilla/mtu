@@ -217,7 +217,7 @@ fn interface_and_mtu_impl(socket: &UdpSocket) -> Result<(String, usize), Error> 
 
 #[cfg(target_os = "windows")]
 fn interface_and_mtu_impl(socket: &UdpSocket) -> Result<(String, usize), Error> {
-    use std::{ffi::c_void, slice};
+    use std::{ffi::c_void, slice, str};
 
     use win_bindings::{
         if_indextoname, FreeMibTable, GetIpInterfaceTable, GetUnicastIpAddressTable, AF_INET,
