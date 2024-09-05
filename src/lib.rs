@@ -350,14 +350,11 @@ mod test {
     fn socket_with_addr(local_ip: IpAddr) -> SocketAddr {
         loop {
             let port = rand::thread_rng().gen_range(1024..65535);
-            let socket = UdpSocket::bind(SocketAddr::new(local_ip, port));
+            let saddr = SocketAddr::new(local_ip, port);
+            let socket = UdpSocket::bind(saddr);
             match socket {
-                Ok(socket) => {
-                    if let Ok(saddr) = socket.local_addr() {
-                        // We found an unused port.
-                        return saddr;
-                    }
-                }
+                // We found an unused port.
+                Ok(socket) => return socket.local_addr().unwrap(),
                 Err(e) => match e.kind() {
                     std::io::ErrorKind::AddrInUse => {
                         // We hit a used port, try again.
@@ -366,7 +363,7 @@ mod test {
                     _ => {
                         // We hit another error. Pretend that worked by returning the socket
                         // address, so the actual code can hit the same error.
-                        return SocketAddr::new(local_ip, port);
+                        return saddr;
                     }
                 },
             }
@@ -395,7 +392,10 @@ mod test {
 
     #[test]
     fn loopback_v4_loopback_v4() {
-        assert!(interface_and_mtu(&(local_v4(), local_v4())).unwrap() == LOOPBACK);
+        assert_eq!(
+            interface_and_mtu(&(local_v4(), local_v4())).unwrap(),
+            LOOPBACK
+        );
     }
 
     #[test]
@@ -410,26 +410,29 @@ mod test {
 
     #[test]
     fn loopback_v6_loopback_v6() {
-        assert!(interface_and_mtu(&(local_v6(), local_v6())).unwrap() == LOOPBACK);
+        assert_eq!(
+            interface_and_mtu(&(local_v6(), local_v6())).unwrap(),
+            LOOPBACK
+        );
     }
     #[test]
     fn none_loopback_v4() {
-        assert!(interface_and_mtu(&(None, local_v4())).unwrap() == LOOPBACK);
+        assert_eq!(interface_and_mtu(&(None, local_v4())).unwrap(), LOOPBACK);
     }
 
     #[test]
     fn none_loopback_v6() {
-        assert!(interface_and_mtu(&(None, local_v6())).unwrap() == LOOPBACK);
+        assert_eq!(interface_and_mtu(&(None, local_v6())).unwrap(), LOOPBACK);
     }
 
     #[test]
     fn loopback_v4_none() {
-        assert!(interface_and_mtu(&(local_v4(), None)).unwrap() == LOOPBACK);
+        assert_eq!(interface_and_mtu(&(local_v4(), None)).unwrap(), LOOPBACK);
     }
 
     #[test]
     fn loopback_v6_none() {
-        assert!(interface_and_mtu(&(local_v6(), None)).unwrap() == LOOPBACK);
+        assert_eq!(interface_and_mtu(&(local_v6(), None)).unwrap(), LOOPBACK);
     }
 
     #[test]
@@ -453,16 +456,16 @@ mod test {
     }
     #[test]
     fn none_inet_v4() {
-        assert!(interface_and_mtu(&(None, inet_v4())).unwrap() == INET);
+        assert_eq!(interface_and_mtu(&(None, inet_v4())).unwrap(), INET);
     }
 
     #[test]
     fn none_inet_v6() {
-        if env::var("CI").is_ok() {
+        if env::var("GITHUB_ACTIONS").is_ok() {
             // The GitHub CI environment does not have IPv6 connectivity.
             return;
         }
-        assert!(interface_and_mtu(&(None, inet_v6())).unwrap() == INET);
+        assert_eq!(interface_and_mtu(&(None, inet_v6())).unwrap(), INET);
     }
 
     #[test]
