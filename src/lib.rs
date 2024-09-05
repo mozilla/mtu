@@ -10,8 +10,6 @@ use std::{
     ptr,
 };
 
-use log::trace;
-
 // Though the module includes `allow(clippy::all)`, that doesn't seem to affect some lints
 #[allow(clippy::semicolon_if_nothing_returned, clippy::struct_field_names)]
 #[cfg(windows)]
@@ -25,8 +23,38 @@ fn default_result<T>() -> Result<(String, T), Error> {
     ))
 }
 
-/// Return the interface name and the maximum transmission unit (MTU) of the local network
-/// interface towards the destination [`SocketAddr`] given in `remote`.
+#[derive(Debug)]
+pub enum SocketAddrs {
+    Local(SocketAddr),
+    Remote(SocketAddr),
+    Both((SocketAddr, SocketAddr)),
+}
+
+impl From<&(SocketAddr, SocketAddr)> for SocketAddrs {
+    fn from((local, remote): &(SocketAddr, SocketAddr)) -> Self {
+        Self::Both((*local, *remote))
+    }
+}
+
+impl From<&(Option<SocketAddr>, SocketAddr)> for SocketAddrs {
+    fn from((local, remote): &(Option<SocketAddr>, SocketAddr)) -> Self {
+        local.map_or(Self::Remote(*remote), |local| Self::Both((local, *remote)))
+    }
+}
+
+impl From<&(SocketAddr, Option<SocketAddr>)> for SocketAddrs {
+    fn from((local, remote): &(SocketAddr, Option<SocketAddr>)) -> Self {
+        remote.map_or(Self::Local(*local), |remote| Self::Both((*local, remote)))
+    }
+}
+
+/// Given a pair of local and remote [`SocketAddr`]s, return the name and maximum
+/// transmission unit (MTU) of the local network interface used by a socket bound to the local
+/// address and connected towards the remote destination.
+///
+/// If the local address is `None`, the function will let the operating system choose the local
+/// address based on the given remote address. If the remote address is `None`, the function will
+/// return the MTU of the local network interface with the given local address.
 ///
 /// The returned MTU may exceed the maximum IP packet size of 65,535 bytes on some
 /// platforms for some remote destinations. (For example, loopback destinations on
@@ -38,49 +66,46 @@ fn default_result<T>() -> Result<(String, T), Error> {
 ///
 /// ```
 /// let saddr = "127.0.0.1:443".parse().unwrap();
-/// let (name, mtu) = mtu::interface_and_mtu(&saddr).unwrap();
+/// let (name, mtu) = mtu::interface_and_mtu(&(None, saddr)).unwrap();
 /// println!("MTU towards {saddr:?} is {mtu} on {name}");
 /// ```
 ///
 /// # Errors
 ///
 /// This function returns an error if the local interface MTU cannot be determined.
-pub fn interface_and_mtu(remote: &SocketAddr) -> Result<(String, usize), Error> {
-    #[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
-    #[allow(unused_assignments)] // Yes, res is reassigned in the platform-specific code.
-    let mut res = default_result();
-
-    #[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
-    {
-        // Make a new socket that is connected to the remote address. We use this to learn which
-        // local address is chosen by routing.
-        let socket = UdpSocket::bind((
+pub fn interface_and_mtu<A>(addrs: A) -> Result<(String, usize), Error>
+where
+    SocketAddrs: From<A>,
+{
+    let addrs = SocketAddrs::from(addrs);
+    let local = match addrs {
+        SocketAddrs::Local(local) | SocketAddrs::Both((local, _)) => local,
+        SocketAddrs::Remote(remote) => SocketAddr::new(
             if remote.is_ipv4() {
                 IpAddr::V4(Ipv4Addr::UNSPECIFIED)
             } else {
                 IpAddr::V6(Ipv6Addr::UNSPECIFIED)
             },
             0,
-        ))?;
-        socket.connect(remote)?;
-
-        #[cfg(any(target_os = "macos", target_os = "linux"))]
-        {
-            res = interface_and_mtu_linux_macos(&socket);
-        }
-
-        #[cfg(target_os = "windows")]
-        {
-            res = interface_and_mtu_windows(&socket);
+        ),
+    };
+    let socket = UdpSocket::bind(local)?;
+    match addrs {
+        SocketAddrs::Local(_) => {}
+        SocketAddrs::Remote(remote) | SocketAddrs::Both((_, remote)) => {
+            socket.connect(remote)?;
         }
     }
+    interface_and_mtu_impl(&socket)
+}
 
-    trace!("MTU towards {remote:?} is {res:?}");
-    res
+#[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+fn interface_and_mtu_impl(socket: &UdpSocket) -> Result<usize, Error> {
+    default_result()
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
-fn interface_and_mtu_linux_macos(socket: &UdpSocket) -> Result<(String, usize), Error> {
+fn interface_and_mtu_impl(socket: &UdpSocket) -> Result<(String, usize), Error> {
     use std::ffi::{c_int, CStr};
     #[cfg(target_os = "linux")]
     use std::{ffi::c_char, mem, os::fd::AsRawFd};
@@ -184,9 +209,11 @@ fn interface_and_mtu_linux_macos(socket: &UdpSocket) -> Result<(String, usize), 
 }
 
 #[cfg(target_os = "windows")]
-fn interface_and_mtu_windows(socket: &UdpSocket) -> Result<(String, usize), Error> {
-    use core::str;
-    use std::{ffi::c_void, slice};
+fn interface_and_mtu_impl(socket: &UdpSocket) -> Result<(String, usize), Error> {
+    use std::{
+        ffi::{c_void, CStr},
+        slice,
+    };
 
     use win_bindings::{
         if_indextoname, FreeMibTable, GetIpInterfaceTable, GetUnicastIpAddressTable, AF_INET,
@@ -245,8 +272,10 @@ fn interface_and_mtu_windows(socket: &UdpSocket) -> Result<(String, usize), Erro
                     if let Ok(mtu) = iface.NlMtu.try_into() {
                         let mut name = [0u8; 256]; // IF_NAMESIZE not available?
                         if unsafe { !if_indextoname(iface.InterfaceIndex, &mut name).is_null() } {
-                            if let Ok(name) = str::from_utf8(&name) {
-                                res = Ok((name.to_string(), mtu));
+                            if let Ok(name) = CStr::from_bytes_until_nul(&name) {
+                                if let Ok(name) = name.to_str() {
+                                    res = Ok((name.to_string(), mtu));
+                                }
                             }
                         } else {
                             res = Err(Error::last_os_error());
@@ -264,80 +293,170 @@ fn interface_and_mtu_windows(socket: &UdpSocket) -> Result<(String, usize), Erro
     res
 }
 
-#[doc(hidden)]
-#[deprecated(since = "0.1.2", note = "Use `interface_and_mtu()` instead")]
-pub fn interface_mtu(remote: &SocketAddr) -> Result<usize, Error> {
-    interface_and_mtu(remote).map(|(_, mtu)| mtu)
-}
-
-#[doc(hidden)]
-#[deprecated(since = "0.1.2", note = "Use `interface_and_mtu()` instead")]
-pub fn get_interface_mtu(remote: &SocketAddr) -> Result<usize, Error> {
-    interface_and_mtu(remote).map(|(_, mtu)| mtu)
-}
-
 #[cfg(test)]
 mod test {
-    use std::net::ToSocketAddrs;
+    use std::{
+        env,
+        net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket},
+    };
 
-    use log::warn;
+    use rand::Rng;
 
-    fn check_mtu(sockaddr: &str, ipv4: bool, expected: usize) {
-        let addr = sockaddr
-            .to_socket_addrs()
-            .unwrap()
-            .find(|a| a.is_ipv4() == ipv4);
-        if let Some(addr) = addr {
-            match super::interface_and_mtu(&addr) {
-                Ok((_, mtu)) => assert_eq!(mtu, expected),
-                Err(e) => {
-                    // Some GitHub runners don't have IPv6. Just warn if we can't get the MTU.
-                    assert!(addr.is_ipv6());
-                    warn!("Error getting MTU for {sockaddr}: {e}");
-                }
-            }
-        } else {
-            // Some GitHub runners don't have IPv6. Just warn if we can't get an IPv6 address.
-            assert!(!ipv4);
-            warn!("No IPv6 address found for {sockaddr}");
+    use crate::interface_and_mtu;
+
+    #[derive(Debug)]
+    struct NameMtu<'a>(Option<&'a str>, usize);
+
+    impl PartialEq<NameMtu<'_>> for (String, usize) {
+        fn eq(&self, other: &NameMtu<'_>) -> bool {
+            other.0.map_or(true, |name| name == self.0) && other.1 == self.1
         }
     }
 
-    #[test]
-    fn loopback_interface_mtu_v4() {
-        #[cfg(target_os = "macos")]
-        check_mtu("localhost:443", true, 16384);
-        #[cfg(target_os = "linux")]
-        check_mtu("localhost:443", false, 65_536);
-        #[cfg(target_os = "windows")]
-        check_mtu("localhost:443", false, 4_294_967_295);
+    #[cfg(target_os = "macos")]
+    const LOOPBACK: NameMtu = NameMtu(Some("lo0"), 16_384);
+    #[cfg(target_os = "linux")]
+    const LOOPBACK: NameMtu = NameMtu(Some("lo"), 65_536);
+    #[cfg(target_os = "windows")]
+    const LOOPBACK: NameMtu = NameMtu(Some("loopback_0"), 4_294_967_295);
+
+    // Non-loopback interface names are unpredictable, so we only check the MTU.
+    #[cfg(target_os = "macos")]
+    const INET: NameMtu = NameMtu(None, 1_500);
+    #[cfg(target_os = "linux")]
+    const INET: NameMtu = NameMtu(None, 1_500);
+    #[cfg(target_os = "windows")]
+    const INET: NameMtu = NameMtu(None, 1_500);
+
+    //  The tests can run in parallel, so try and find unused ports for all the tests.
+    fn socket_with_addr(local_ip: IpAddr) -> SocketAddr {
+        loop {
+            let port = rand::thread_rng().gen_range(1024..65535);
+            let saddr = SocketAddr::new(local_ip, port);
+            let socket = UdpSocket::bind(saddr);
+            match socket {
+                // We found an unused port.
+                Ok(socket) => return socket.local_addr().unwrap(),
+                Err(e) => match e.kind() {
+                    std::io::ErrorKind::AddrInUse => {
+                        // We hit a used port, try again.
+                        continue;
+                    }
+                    _ => {
+                        // We hit another error. Pretend that worked by returning the socket
+                        // address, so the actual code can hit the same error.
+                        return saddr;
+                    }
+                },
+            }
+        }
+    }
+
+    fn local_v4() -> SocketAddr {
+        socket_with_addr(IpAddr::V4(Ipv4Addr::LOCALHOST))
+    }
+
+    fn local_v6() -> SocketAddr {
+        socket_with_addr(IpAddr::V6(Ipv6Addr::LOCALHOST))
+    }
+
+    fn inet_v4() -> SocketAddr {
+        // cloudflare.com
+        socket_with_addr(IpAddr::V4(Ipv4Addr::new(104, 16, 132, 229)))
+    }
+
+    fn inet_v6() -> SocketAddr {
+        // cloudflare.com
+        socket_with_addr(IpAddr::V6(Ipv6Addr::new(
+            0x26, 0x06, 0x47, 0x00, 0x68, 0x10, 0x84, 0xe5,
+        )))
     }
 
     #[test]
-    fn loopback_interface_mtu_v6() {
-        #[cfg(target_os = "macos")]
-        check_mtu("localhost:443", false, 16384);
-        #[cfg(target_os = "linux")]
-        check_mtu("localhost:443", false, 65_536);
-        #[cfg(target_os = "windows")]
-        check_mtu("localhost:443", false, 4_294_967_295);
+    fn loopback_v4_loopback_v4() {
+        assert_eq!(
+            interface_and_mtu(&(local_v4(), local_v4())).unwrap(),
+            LOOPBACK
+        );
     }
 
     #[test]
-    fn default_interface_mtu_v4() {
-        check_mtu("ietf.org:443", true, 1500);
+    fn loopback_v4_loopback_v6() {
+        assert!(interface_and_mtu(&(local_v4(), local_v6())).is_err());
     }
 
     #[test]
-    fn default_interface_mtu_v6() {
-        check_mtu("ietf.org:443", false, 1500);
+    fn loopback_v6_loopback_v4() {
+        assert!(interface_and_mtu(&(local_v6(), local_v4())).is_err());
     }
 
     #[test]
-    #[allow(deprecated)] // Purpose of the test is to cover deprecated functions.
-    fn deprecated_functions() {
-        let addr = "localhost:443".to_socket_addrs().unwrap().next().unwrap();
-        assert!(super::interface_mtu(&addr).is_ok());
-        assert!(super::get_interface_mtu(&addr).is_ok());
+    fn loopback_v6_loopback_v6() {
+        assert_eq!(
+            interface_and_mtu(&(local_v6(), local_v6())).unwrap(),
+            LOOPBACK
+        );
+    }
+    #[test]
+    fn none_loopback_v4() {
+        assert_eq!(interface_and_mtu(&(None, local_v4())).unwrap(), LOOPBACK);
+    }
+
+    #[test]
+    fn none_loopback_v6() {
+        assert_eq!(interface_and_mtu(&(None, local_v6())).unwrap(), LOOPBACK);
+    }
+
+    #[test]
+    fn loopback_v4_none() {
+        assert_eq!(interface_and_mtu(&(local_v4(), None)).unwrap(), LOOPBACK);
+    }
+
+    #[test]
+    fn loopback_v6_none() {
+        assert_eq!(interface_and_mtu(&(local_v6(), None)).unwrap(), LOOPBACK);
+    }
+
+    #[test]
+    fn inet_v4_inet_v4() {
+        assert!(interface_and_mtu(&(inet_v4(), inet_v4())).is_err());
+    }
+
+    #[test]
+    fn inet_v4_inet_v6() {
+        assert!(interface_and_mtu(&(inet_v4(), inet_v6())).is_err());
+    }
+
+    #[test]
+    fn inet_v6_inet_v4() {
+        assert!(interface_and_mtu(&(inet_v6(), inet_v4())).is_err());
+    }
+
+    #[test]
+    fn inet_v6_inet_v6() {
+        assert!(interface_and_mtu(&(inet_v6(), inet_v6())).is_err());
+    }
+    #[test]
+    fn none_inet_v4() {
+        assert_eq!(interface_and_mtu(&(None, inet_v4())).unwrap(), INET);
+    }
+
+    #[test]
+    fn none_inet_v6() {
+        if env::var("GITHUB_ACTIONS").is_ok() {
+            // The GitHub CI environment does not have IPv6 connectivity.
+            return;
+        }
+        assert_eq!(interface_and_mtu(&(None, inet_v6())).unwrap(), INET);
+    }
+
+    #[test]
+    fn inet_v4_none() {
+        assert!(interface_and_mtu(&(inet_v4(), None)).is_err());
+    }
+
+    #[test]
+    fn inet_v6_none() {
+        assert!(interface_and_mtu(&(inet_v6(), None)).is_err());
     }
 }
