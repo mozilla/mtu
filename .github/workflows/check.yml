@@ -69,7 +69,7 @@ jobs:
         with:
           version: ${{ matrix.rust-toolchain }}
           components: rustfmt, clippy, llvm-tools-preview, ${{ matrix.rust-toolchain == 'nightly' && 'rust-src' || '' }}
-          tools: cargo-llvm-cov, cargo-nextest, cargo-hack, cargo-machete cargo-semver-checks
+          tools: cargo-llvm-cov, cargo-nextest, cargo-hack, cargo-machete, ${{ matrix.rust-toolchain == 'stable' && 'cargo-semver-checks' || '' }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build
