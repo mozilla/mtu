@@ -48,12 +48,6 @@ impl From<&(SocketAddr, Option<SocketAddr>)> for SocketAddrs {
     }
 }
 
-impl From<&SocketAddr> for SocketAddrs {
-    fn from(local: &SocketAddr) -> Self {
-        Self::Local(*local)
-    }
-}
-
 /// Given a pair of local and remote [`SocketAddr`]s, return the name and maximum
 /// transmission unit (MTU) of the local network interface used by a socket bound to the local
 /// address and connected towards the remote destination.
@@ -299,18 +293,6 @@ fn interface_and_mtu_impl(socket: &UdpSocket) -> Result<(String, usize), Error> 
     res
 }
 
-#[doc(hidden)]
-#[deprecated(since = "0.1.2", note = "Use `interface_and_mtu()` instead")]
-pub fn interface_mtu(remote: &SocketAddr) -> Result<usize, Error> {
-    interface_and_mtu(SocketAddrs::Remote(*remote)).map(|(_, mtu)| mtu)
-}
-
-#[doc(hidden)]
-#[deprecated(since = "0.1.2", note = "Use `interface_and_mtu()` instead")]
-pub fn get_interface_mtu(remote: &SocketAddr) -> Result<usize, Error> {
-    interface_and_mtu(SocketAddrs::Remote(*remote)).map(|(_, mtu)| mtu)
-}
-
 #[cfg(test)]
 mod test {
     use std::{
@@ -476,13 +458,5 @@ mod test {
     #[test]
     fn inet_v6_none() {
         assert!(interface_and_mtu(&(inet_v6(), None)).is_err());
-    }
-
-    #[test]
-    #[allow(deprecated)] // Purpose of the test is to cover deprecated functions.
-    fn deprecated_functions() {
-        assert!(super::interface_mtu(&local_v4()).is_ok());
-        assert!(super::get_interface_mtu(&local_v4()).is_ok());
-        assert!(interface_and_mtu(&local_v4()).is_ok());
     }
 }
