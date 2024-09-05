@@ -136,4 +136,5 @@ jobs:
         if: matrix.type == 'debug' && matrix.rust-toolchain == 'stable' && endsWith(matrix.os, '-latest')
 
       - name: cargo-semver-checks
+        if: matrix.rust-toolchain == 'stable'
         run: cargo semver-checks
