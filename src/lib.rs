@@ -105,10 +105,12 @@ fn interface_and_mtu_impl(_socket: &UdpSocket) -> Result<(String, usize), Error>
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 fn interface_and_mtu_impl(socket: &UdpSocket) -> Result<(String, usize), Error> {
-    use std::ffi::{c_int, CStr};
-    use std::ptr;
     #[cfg(target_os = "linux")]
     use std::{ffi::c_char, mem, os::fd::AsRawFd};
+    use std::{
+        ffi::{c_int, CStr},
+        ptr,
+    };
 
     use libc::{
         freeifaddrs, getifaddrs, ifaddrs, in_addr_t, sockaddr_in, sockaddr_in6, AF_INET, AF_INET6,
