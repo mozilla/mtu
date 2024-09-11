@@ -7,7 +7,6 @@
 use std::{
     io::{Error, ErrorKind},
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket},
-    ptr,
 };
 
 // Though the module includes `allow(clippy::all)`, that doesn't seem to affect some lints
@@ -100,13 +99,14 @@ where
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
-fn interface_and_mtu_impl(socket: &UdpSocket) -> Result<usize, Error> {
+fn interface_and_mtu_impl(_socket: &UdpSocket) -> Result<(String, usize), Error> {
     default_result()
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 fn interface_and_mtu_impl(socket: &UdpSocket) -> Result<(String, usize), Error> {
     use std::ffi::{c_int, CStr};
+    use std::ptr;
     #[cfg(target_os = "linux")]
     use std::{ffi::c_char, mem, os::fd::AsRawFd};
 
@@ -212,7 +212,7 @@ fn interface_and_mtu_impl(socket: &UdpSocket) -> Result<(String, usize), Error> 
 fn interface_and_mtu_impl(socket: &UdpSocket) -> Result<(String, usize), Error> {
     use std::{
         ffi::{c_void, CStr},
-        slice,
+        ptr, slice,
     };
 
     use win_bindings::{
