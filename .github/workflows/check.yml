@@ -150,14 +150,15 @@ jobs:
       - name: Get "Install Rust" action from neqo
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
-          repository: mozilla/neqo
+          repository: mxinden/neqo
+          branch: rust-targets
           sparse-checkout: |
             .github/actions/rust
           path: neqo
 
       - name: Install Rust
         uses: ./neqo/.github/actions/rust
-
-      - run: rustup target add x86_64-unknown-freebsd
+        with:
+          targets: x86_64-unknown-freebsd
 
       - run: cargo check --target x86_64-unknown-freebsd
