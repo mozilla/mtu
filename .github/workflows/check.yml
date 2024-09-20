@@ -140,3 +140,24 @@ jobs:
       - name: cargo-semver-checks
         if: matrix.rust-toolchain == 'stable'
         run: cargo semver-checks
+
+  check-freebsd:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+
+      - name: Get "Install Rust" action from neqo
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        with:
+          repository: mozilla/neqo
+          sparse-checkout: |
+            .github/actions/rust
+          path: neqo
+
+      - name: Install Rust
+        uses: ./neqo/.github/actions/rust
+        with:
+          targets: x86_64-unknown-freebsd
+
+      - run: cargo check --target x86_64-unknown-freebsd
