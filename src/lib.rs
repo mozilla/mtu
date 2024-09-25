@@ -340,8 +340,8 @@ mod test {
                 // We found an unused port.
                 Ok(socket) => return socket.local_addr().unwrap(),
                 Err(e) => match e.kind() {
-                    std::io::ErrorKind::AddrInUse => {
-                        // We hit a used port, try again.
+                    std::io::ErrorKind::AddrInUse | std::io::ErrorKind::PermissionDenied => {
+                        // We hit a used or priviledged port, try again.
                         continue;
                     }
                     _ => {
