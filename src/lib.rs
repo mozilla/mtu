@@ -47,6 +47,8 @@ impl From<&(SocketAddr, Option<SocketAddr>)> for SocketAddrs {
     }
 }
 
+/// Return the name and maximum transmission unit (MTU) of a local network interface.
+///
 /// Given a pair of local and remote [`SocketAddr`]s, return the name and maximum
 /// transmission unit (MTU) of the local network interface used by a socket bound to the local
 /// address and connected towards the remote destination.
@@ -338,13 +340,7 @@ mod test {
         }
     }
 
-    #[cfg(any(
-        target_os = "macos",
-        target_os = "freebsd",
-        target_os = "netbsd",
-        target_os = "openbsd",
-        target_os = "freebsd"
-    ))]
+    #[cfg(any(target_os = "macos", target_os = "freebsd",))]
     const LOOPBACK: NameMtu = NameMtu(Some("lo0"), 16_384);
     #[cfg(target_os = "linux")]
     const LOOPBACK: NameMtu = NameMtu(Some("lo"), 65_536);
