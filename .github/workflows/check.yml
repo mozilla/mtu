@@ -75,12 +75,18 @@ jobs:
           cargo +${{ matrix.rust-toolchain }} check $BUILD_TYPE --all-targets
 
       - name: Run tests and determine coverage
+        env:
+          RUST_LOG: trace
         run: |
           # shellcheck disable=SC2086
           if [ "${{ matrix.rust-toolchain }}" == "stable" ] && [ "${{ matrix.type }}" == "debug" ] && [ "${{endsWith(matrix.os, '-latest') && 'latest' || '' }}" == "latest" ]; then
-            RUST_LOG=trace cargo +${{ matrix.rust-toolchain }} llvm-cov nextest $BUILD_TYPE --no-fail-fast --lcov --output-path lcov.info
+            cargo +${{ matrix.rust-toolchain }} llvm-cov nextest $BUILD_TYPE --no-fail-fast --lcov --output-path lcov.info
           else
-            RUST_LOG=trace cargo +${{ matrix.rust-toolchain }} nextest run $BUILD_TYPE --no-fail-fast
+            if [ "${{ startsWith(matrix.os, 'windows') && 'windows' || '' }}" == "windows" ]; then
+              cargo +${{ matrix.rust-toolchain }} test $BUILD_TYPE --no-fail-fast
+            else
+              cargo +${{ matrix.rust-toolchain }} nextest run $BUILD_TYPE --no-fail-fast
+            fi
           fi
           cargo +${{ matrix.rust-toolchain }} bench --no-run
       - uses: codecov/codecov-action@e28ff129e5465c2c0dcc6f003fc735cb6ae0c673 # v4.5.0
@@ -95,6 +101,8 @@ jobs:
 
       - name: Run tests with sanitizers
         if: (matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest') && matrix.rust-toolchain == 'nightly'
+        env:
+          RUST_LOG: trace
         run: |
           if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
             TARGET="x86_64-unknown-linux-gnu"
@@ -106,7 +114,7 @@ jobs:
           fi
           for sanitizer in $SANITIZERS; do
             echo "Running tests with $sanitizer sanitizer..."
-            RUSTFLAGS="-Z sanitizer=$sanitizer" RUSTDOCFLAGS="-Z sanitizer=$sanitizer" cargo +nightly test -Z build-std --target "$TARGET"
+            RUSTFLAGS="-Z sanitizer=$sanitizer" RUSTDOCFLAGS="-Z sanitizer=$sanitizer" cargo +nightly nextest run -Z build-std --target "$TARGET"
           done
 
   clippy:
