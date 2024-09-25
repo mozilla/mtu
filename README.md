@@ -21,6 +21,9 @@ println!("MTU for {saddr:?} is {mtu} on {name}");
 * Linux
 * macOS
 * Windows
+* FreeBSD
+* NetBSD
+* OpenBSD
 
 ## Notes
 
