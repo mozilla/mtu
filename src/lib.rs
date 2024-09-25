@@ -98,12 +98,25 @@ where
     interface_and_mtu_impl(&socket)
 }
 
-#[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+#[cfg(not(any(
+    target_os = "macos",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd",
+    target_os = "linux",
+    target_os = "windows"
+)))]
 fn interface_and_mtu_impl(_socket: &UdpSocket) -> Result<(String, usize), Error> {
     default_result()
 }
 
-#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[cfg(any(
+    target_os = "macos",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd",
+    target_os = "linux"
+))]
 fn interface_and_mtu_impl(socket: &UdpSocket) -> Result<(String, usize), Error> {
     #[cfg(target_os = "linux")]
     use std::{ffi::c_char, mem, os::fd::AsRawFd};
@@ -115,7 +128,12 @@ fn interface_and_mtu_impl(socket: &UdpSocket) -> Result<(String, usize), Error> 
     use libc::{
         freeifaddrs, getifaddrs, ifaddrs, in_addr_t, sockaddr_in, sockaddr_in6, AF_INET, AF_INET6,
     };
-    #[cfg(target_os = "macos")]
+    #[cfg(any(
+        target_os = "macos",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "openbsd"
+    ))]
     use libc::{if_data, AF_LINK};
     #[cfg(target_os = "linux")]
     use libc::{ifreq, ioctl};
@@ -160,7 +178,12 @@ fn interface_and_mtu_impl(socket: &UdpSocket) -> Result<(String, usize), Error> 
     // If we have found the interface name we are looking for, find the MTU.
     let mut res = default_result();
     if let Some(iface) = iface {
-        #[cfg(target_os = "macos")]
+        #[cfg(any(
+            target_os = "macos",
+            target_os = "freebsd",
+            target_os = "netbsd",
+            target_os = "openbsd"
+        ))]
         {
             // On macOS, we need to loop again to find the MTU of that interface. We need to
             // do two loops, because `getifaddrs` returns one entry per
@@ -315,7 +338,13 @@ mod test {
         }
     }
 
-    #[cfg(any(target_os = "macos", target_os = "freebsd"))]
+    #[cfg(any(
+        target_os = "macos",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "openbsd",
+        target_os = "freebsd"
+    ))]
     const LOOPBACK: NameMtu = NameMtu(Some("lo0"), 16_384);
     #[cfg(target_os = "linux")]
     const LOOPBACK: NameMtu = NameMtu(Some("lo"), 65_536);

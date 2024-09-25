@@ -166,7 +166,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [freebsd, openbsd, netbsd, solaris]
+        os: [freebsd, openbsd, netbsd] # rust on solaris is too old
     runs-on: ubuntu-latest
 
     steps:
