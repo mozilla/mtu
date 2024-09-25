@@ -77,7 +77,7 @@ jobs:
       - name: Run tests and determine coverage
         run: |
           # shellcheck disable=SC2086
-          if [ "${{ matrix.rust-toolchain }}" == "stable" ]; then
+          if [ "${{ matrix.rust-toolchain }}" == "stable" ] && [ "${{ matrix.type }}" == "debug" ] && [ "${{endsWith(matrix.os, '-latest') && 'latest' }} == "latest" ]; then
             RUST_LOG=trace cargo +${{ matrix.rust-toolchain }} llvm-cov nextest $BUILD_TYPE --no-fail-fast --lcov --output-path lcov.info
           else
             RUST_LOG=trace cargo +${{ matrix.rust-toolchain }} nextest run $BUILD_TYPE --no-fail-fast
