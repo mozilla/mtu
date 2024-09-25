@@ -315,19 +315,18 @@ mod test {
         }
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "freebsd"))]
     const LOOPBACK: NameMtu = NameMtu(Some("lo0"), 16_384);
     #[cfg(target_os = "linux")]
     const LOOPBACK: NameMtu = NameMtu(Some("lo"), 65_536);
     #[cfg(target_os = "windows")]
     const LOOPBACK: NameMtu = NameMtu(Some("loopback_0"), 4_294_967_295);
+    #[cfg(target_os = "openbsd")]
+    const LOOPBACK: NameMtu = NameMtu(Some("lo0"), 32_768);
+    #[cfg(target_os = "netbsd")]
+    const LOOPBACK: NameMtu = NameMtu(Some("lo0"), 33_624);
 
     // Non-loopback interface names are unpredictable, so we only check the MTU.
-    #[cfg(target_os = "macos")]
-    const INET: NameMtu = NameMtu(None, 1_500);
-    #[cfg(target_os = "linux")]
-    const INET: NameMtu = NameMtu(None, 1_500);
-    #[cfg(target_os = "windows")]
     const INET: NameMtu = NameMtu(None, 1_500);
 
     //  The tests can run in parallel, so try and find unused ports for all the tests.
