@@ -88,7 +88,7 @@ jobs:
             else
               export FILTER="default()"
             fi
-            cargo +${{ matrix.rust-toolchain }} nextest run $BUILD_TYPE --no-fail-fast -E $FILTER
+            cargo +${{ matrix.rust-toolchain }} nextest run $BUILD_TYPE --no-fail-fast -E "$FILTER"
           fi
           cargo +${{ matrix.rust-toolchain }} bench --no-run
       - uses: codecov/codecov-action@e28ff129e5465c2c0dcc6f003fc735cb6ae0c673 # v4.5.0
