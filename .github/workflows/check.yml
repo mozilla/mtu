@@ -119,105 +119,6 @@ jobs:
             RUSTFLAGS="-Z sanitizer=$sanitizer" RUSTDOCFLAGS="-Z sanitizer=$sanitizer" cargo +nightly nextest run -Z build-std --target "$TARGET"
           done
 
-  clippy:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
-        with:
-          repository: mozilla/neqo
-          sparse-checkout: |
-            .github/actions/rust
-          path: neqo
-      - uses: ./neqo/.github/actions/rust
-        with:
-          components: clippy
-          tools: cargo-hack
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - run: cargo hack clippy --all-targets --feature-powerset -- -D warnings
-      - run: cargo doc --workspace --no-deps --document-private-items
-        env:
-          RUSTDOCFLAGS: "--deny rustdoc::broken_intra_doc_links --deny warnings"
-
-  check-freebsd:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
-        with:
-          repository: mozilla/neqo
-          sparse-checkout: |
-            .github/actions/rust
-          path: neqo
-      - uses: ./neqo/.github/actions/rust
-        with:
-          targets: x86_64-unknown-freebsd
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - run: cargo check --target x86_64-unknown-freebsd
-
-  machete:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
-        with:
-          repository: mozilla/neqo
-          sparse-checkout: |
-            .github/actions/rust
-          path: neqo
-      - uses: ./neqo/.github/actions/rust
-        with:
-          tools: cargo-machete
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-        #  --with-metadata has false positives, see https://github.com/bnjbvr/cargo-machete/issues/127
-      - run: cargo machete
-
-
-  format:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
-        with:
-          repository: mozilla/neqo
-          sparse-checkout: |
-            .github/actions/rust
-          path: neqo
-      - uses: ./neqo/.github/actions/rust
-        with:
-          version: nightly
-          components: rustfmt
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - run: cargo fmt --all -- --check
-
-  semver:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
-        with:
-          repository: mozilla/neqo
-          sparse-checkout: |
-            .github/actions/rust
-          path: neqo
-      - uses: ./neqo/.github/actions/rust
-        with:
-          tools: cargo-semver-checks
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - run: cargo semver-checks
-
   check-vm:
     strategy:
       fail-fast: false
@@ -274,3 +175,85 @@ jobs:
           run: |
             cargo check --all-targets
             RUST_LOG=trace cargo test --no-fail-fast
+
+  clippy:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        with:
+          repository: mozilla/neqo
+          sparse-checkout: |
+            .github/actions/rust
+          path: neqo
+      - uses: ./neqo/.github/actions/rust
+        with:
+          components: clippy
+          tools: cargo-hack
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - run: cargo hack clippy --all-targets --feature-powerset -- -D warnings
+      - run: cargo doc --workspace --no-deps --document-private-items
+        env:
+          RUSTDOCFLAGS: "--deny rustdoc::broken_intra_doc_links --deny warnings"
+
+  machete:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        with:
+          repository: mozilla/neqo
+          sparse-checkout: |
+            .github/actions/rust
+          path: neqo
+      - uses: ./neqo/.github/actions/rust
+        with:
+          tools: cargo-machete
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+        #  --with-metadata has false positives, see https://github.com/bnjbvr/cargo-machete/issues/127
+      - run: cargo machete
+
+
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        with:
+          repository: mozilla/neqo
+          sparse-checkout: |
+            .github/actions/rust
+          path: neqo
+      - uses: ./neqo/.github/actions/rust
+        with:
+          version: nightly
+          components: rustfmt
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - run: cargo fmt --all -- --check
+
+  semver:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        with:
+          repository: mozilla/neqo
+          sparse-checkout: |
+            .github/actions/rust
+          path: neqo
+      - uses: ./neqo/.github/actions/rust
+        with:
+          tools: cargo-semver-checks
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - run: cargo semver-checks
