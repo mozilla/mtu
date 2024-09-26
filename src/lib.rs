@@ -299,7 +299,6 @@ fn interface_and_mtu_impl(socket: &UdpSocket) -> Result<(String, usize), Error> 
 mod test {
     use std::{
         env,
-        io::ErrorKind,
         net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket},
     };
 
@@ -341,8 +340,8 @@ mod test {
                 // We found an unused port.
                 Ok(socket) => return socket.local_addr().unwrap(),
                 Err(e) => match e.kind() {
-                    ErrorKind::AddrInUse | ErrorKind::PermissionDenied => {
-                        // We hit a used or priviledged port, try again.
+                    std::io::ErrorKind::AddrInUse => {
+                        // We hit a used port, try again.
                         continue;
                     }
                     _ => {
