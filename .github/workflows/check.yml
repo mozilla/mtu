@@ -20,7 +20,6 @@ permissions:
 
 jobs:
   check:
-    name: Check
     strategy:
       fail-fast: false
       matrix:
@@ -55,38 +54,57 @@ jobs:
         shell: bash
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
-      - name: Get "Install Rust" action from neqo
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           repository: mozilla/neqo
           sparse-checkout: |
             .github/actions/rust
           path: neqo
-
-      - name: Install Rust
-        uses: ./neqo/.github/actions/rust
+      - uses: ./neqo/.github/actions/rust
         with:
           version: ${{ matrix.rust-toolchain }}
-          components: rustfmt, clippy, llvm-tools-preview, ${{ matrix.rust-toolchain == 'nightly' && 'rust-src' || '' }}
-          tools: cargo-llvm-cov, cargo-nextest, cargo-hack, cargo-machete, ${{ matrix.rust-toolchain == 'stable' && 'cargo-semver-checks' || '' }}
+          components: ${{ matrix.rust-toolchain == 'stable' && 'llvm-tools-preview' || '' }} ${{ matrix.rust-toolchain == 'nightly' && 'rust-src' || '' }}
+          tools: ${{ matrix.rust-toolchain == 'stable' && 'cargo-llvm-cov, ' || '' }} cargo-nextest
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build
+      - name: Check
         run: |
           # shellcheck disable=SC2086
-          cargo +${{ matrix.rust-toolchain }} build $BUILD_TYPE --all-targets
+          cargo +${{ matrix.rust-toolchain }} check $BUILD_TYPE --all-targets
 
       - name: Run tests and determine coverage
+        env:
+          RUST_LOG: trace
         run: |
           # shellcheck disable=SC2086
-          RUST_LOG=trace cargo +${{ matrix.rust-toolchain }} llvm-cov nextest $BUILD_TYPE --no-fail-fast --lcov --output-path lcov.info
+          if [ "${{ matrix.rust-toolchain }}" == "stable" ] && [ "${{ matrix.type }}" == "debug" ] && [ "${{endsWith(matrix.os, '-latest') && 'latest' || '' }}" == "latest" ]; then
+            cargo +${{ matrix.rust-toolchain }} llvm-cov nextest $BUILD_TYPE --no-fail-fast --lcov --output-path lcov.info
+          else
+            if [ "${{ startsWith(matrix.os, 'windows') && 'windows' || '' }}" == "windows" ]; then
+              # The codegen_windows_bindings test only succeeds when run via llvm-cov?!
+              export FILTER="not test(codegen_windows_bindings)"
+            else
+              export FILTER="default()"
+            fi
+            cargo +${{ matrix.rust-toolchain }} nextest run $BUILD_TYPE --no-fail-fast -E "$FILTER"
+          fi
           cargo +${{ matrix.rust-toolchain }} bench --no-run
+      - uses: codecov/codecov-action@e28ff129e5465c2c0dcc6f003fc735cb6ae0c673 # v4.5.0
+        with:
+          file: lcov.info
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        if: matrix.type == 'debug' && matrix.rust-toolchain == 'stable' && endsWith(matrix.os, '-latest')
 
       - name: Run tests with sanitizers
         if: (matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest') && matrix.rust-toolchain == 'nightly'
+        env:
+          RUST_LOG: trace
         run: |
           if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
             TARGET="x86_64-unknown-linux-gnu"
@@ -98,48 +116,89 @@ jobs:
           fi
           for sanitizer in $SANITIZERS; do
             echo "Running tests with $sanitizer sanitizer..."
-            RUSTFLAGS="-Z sanitizer=$sanitizer" RUSTDOCFLAGS="-Z sanitizer=$sanitizer" cargo +nightly test -Z build-std --target "$TARGET"
+            RUSTFLAGS="-Z sanitizer=$sanitizer" RUSTDOCFLAGS="-Z sanitizer=$sanitizer" cargo +nightly nextest run -Z build-std --target "$TARGET"
           done
 
-      - name: Check formatting
-        run: |
-          if [ "${{ matrix.rust-toolchain }}" != "nightly" ]; then
-            CONFIG_PATH="--config-path=$(mktemp)"
-          fi
-          # shellcheck disable=SC2086
-          cargo +${{ matrix.rust-toolchain }} fmt --all -- --check $CONFIG_PATH
-        if: success() || failure()
+  clippy:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        with:
+          repository: mozilla/neqo
+          sparse-checkout: |
+            .github/actions/rust
+          path: neqo
+      - uses: ./neqo/.github/actions/rust
+        with:
+          components: clippy
+          tools: cargo-hack
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Check for unused dependencies
-        run: |
-          #  --with-metadata has false positives, see https://github.com/bnjbvr/cargo-machete/issues/127
-          cargo +${{ matrix.rust-toolchain }} machete
-
-      - name: Clippy
-        run: |
-          cargo +${{ matrix.rust-toolchain }} hack clippy --all-targets --feature-powerset -- -D warnings || ${{ matrix.rust-toolchain == 'nightly' }}
-        if: success() || failure()
-
-      - name: Check rustdoc links
-        run: cargo +${{ matrix.rust-toolchain }} doc --workspace --no-deps --document-private-items
+      - run: cargo hack clippy --all-targets --feature-powerset -- -D warnings
+      - run: cargo doc --workspace --no-deps --document-private-items
         env:
           RUSTDOCFLAGS: "--deny rustdoc::broken_intra_doc_links --deny warnings"
-        if: success() || failure()
 
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@e28ff129e5465c2c0dcc6f003fc735cb6ae0c673 # v4.5.0
+  machete:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
-          file: lcov.info
-          fail_ci_if_error: false
-          token: ${{ secrets.CODECOV_TOKEN }}
-          verbose: true
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        if: matrix.type == 'debug' && matrix.rust-toolchain == 'stable' && endsWith(matrix.os, '-latest')
+          repository: mozilla/neqo
+          sparse-checkout: |
+            .github/actions/rust
+          path: neqo
+      - uses: ./neqo/.github/actions/rust
+        with:
+          tools: cargo-machete
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: cargo-semver-checks
-        if: matrix.rust-toolchain == 'stable'
-        run: cargo semver-checks
+        #  --with-metadata has false positives, see https://github.com/bnjbvr/cargo-machete/issues/127
+      - run: cargo machete
+
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        with:
+          repository: mozilla/neqo
+          sparse-checkout: |
+            .github/actions/rust
+          path: neqo
+      - uses: ./neqo/.github/actions/rust
+        with:
+          version: nightly
+          components: rustfmt
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - run: cargo fmt --all -- --check
+
+  semver:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        with:
+          repository: mozilla/neqo
+          sparse-checkout: |
+            .github/actions/rust
+          path: neqo
+      - uses: ./neqo/.github/actions/rust
+        with:
+          tools: cargo-semver-checks
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - run: cargo semver-checks
 
   check-vm:
     strategy:
