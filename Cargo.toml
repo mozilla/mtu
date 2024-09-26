@@ -7,7 +7,7 @@ homepage = "https://github.com/mozilla/mtu/"
 repository = "https://github.com/mozilla/mtu/"
 authors = ["The Mozilla Necko Team <necko@mozilla.com>"]
 readme = "README.md"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 # Don't increase beyond what Firefox is currently using:

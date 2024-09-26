@@ -80,7 +80,11 @@ where
 {
     let addrs = SocketAddrs::from(addrs);
     let local = match addrs {
-        SocketAddrs::Local(local) | SocketAddrs::Both((local, _)) => local,
+        SocketAddrs::Local(mut local) | SocketAddrs::Both((mut local, _)) => {
+            // Let the OS choose an unused local port.
+            local.set_port(0);
+            local
+        }
         SocketAddrs::Remote(remote) => SocketAddr::new(
             if remote.is_ipv4() {
                 IpAddr::V4(Ipv4Addr::UNSPECIFIED)
