@@ -241,6 +241,7 @@ jobs:
           run: |
             cargo check --all-targets
             RUST_LOG=trace cargo test --no-fail-fast
+
       - if: matrix.os == 'openbsd'
         uses: vmactions/openbsd-vm@ebafa4eac4adf5e7d04e5bbb4aa764b75dd160df
         with:
@@ -251,6 +252,7 @@ jobs:
           run: |
             cargo check --all-targets
             RUST_LOG=trace cargo test --no-fail-fast
+
       - if: matrix.os == 'netbsd'
         uses: vmactions/netbsd-vm@dd0161ecbb6386e562fd098acf367633501487a4
         with:
@@ -261,6 +263,7 @@ jobs:
           run: |
             cargo check --all-targets
             RUST_LOG=trace cargo test --no-fail-fast
+
       - if: matrix.os == 'solaris'
         uses: vmactions/solaris-vm@960d7483ffd6ac03397964cf6423a2f41332c9c8
         with:
