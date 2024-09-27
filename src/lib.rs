@@ -24,30 +24,26 @@ fn default_result<T>() -> Result<(String, T), Error> {
 
 #[derive(Debug)]
 pub enum SocketAddrs {
-    Local(SocketAddr),
+    Local(IpAddr),
     Remote(SocketAddr),
-    Both((SocketAddr, SocketAddr)),
+    Both((IpAddr, SocketAddr)),
 }
 
 impl From<&(IpAddr, SocketAddr)> for SocketAddrs {
     fn from((local, remote): &(IpAddr, SocketAddr)) -> Self {
-        Self::Both((SocketAddr::new(*local, 0), *remote))
+        Self::Both((*local, *remote))
     }
 }
 
 impl From<&(Option<IpAddr>, SocketAddr)> for SocketAddrs {
     fn from((local, remote): &(Option<IpAddr>, SocketAddr)) -> Self {
-        local.map_or(Self::Remote(*remote), |local| {
-            Self::Both((SocketAddr::new(local, 0), *remote))
-        })
+        local.map_or(Self::Remote(*remote), |local| Self::Both((local, *remote)))
     }
 }
 
 impl From<&(IpAddr, Option<SocketAddr>)> for SocketAddrs {
     fn from((local, remote): &(IpAddr, Option<SocketAddr>)) -> Self {
-        remote.map_or(Self::Local(SocketAddr::new(*local, 0)), |remote| {
-            Self::Both((SocketAddr::new(*local, 0), remote))
-        })
+        remote.map_or(Self::Local(*local), |remote| Self::Both((*local, remote)))
     }
 }
 
@@ -85,16 +81,16 @@ where
     let addrs = SocketAddrs::from(addrs);
     let local = match addrs {
         SocketAddrs::Local(local) | SocketAddrs::Both((local, _)) => local,
-        SocketAddrs::Remote(remote) => SocketAddr::new(
+        SocketAddrs::Remote(remote) => {
             if remote.is_ipv4() {
                 IpAddr::V4(Ipv4Addr::UNSPECIFIED)
             } else {
                 IpAddr::V6(Ipv6Addr::UNSPECIFIED)
-            },
-            0,
-        ),
+            }
+        }
     };
-    let socket = UdpSocket::bind(local)?;
+    // Let the OS choose an unused local port.
+    let socket = UdpSocket::bind(SocketAddr::new(local, 0))?;
     match addrs {
         SocketAddrs::Local(_) => {}
         SocketAddrs::Remote(remote) | SocketAddrs::Both((_, remote)) => {
