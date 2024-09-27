@@ -24,25 +24,25 @@ fn default_result<T>() -> Result<(String, T), Error> {
 
 #[derive(Debug)]
 pub enum SocketAddrs {
-    Local(SocketAddr),
+    Local(IpAddr),
     Remote(SocketAddr),
-    Both((SocketAddr, SocketAddr)),
+    Both((IpAddr, SocketAddr)),
 }
 
-impl From<&(SocketAddr, SocketAddr)> for SocketAddrs {
-    fn from((local, remote): &(SocketAddr, SocketAddr)) -> Self {
+impl From<&(IpAddr, SocketAddr)> for SocketAddrs {
+    fn from((local, remote): &(IpAddr, SocketAddr)) -> Self {
         Self::Both((*local, *remote))
     }
 }
 
-impl From<&(Option<SocketAddr>, SocketAddr)> for SocketAddrs {
-    fn from((local, remote): &(Option<SocketAddr>, SocketAddr)) -> Self {
+impl From<&(Option<IpAddr>, SocketAddr)> for SocketAddrs {
+    fn from((local, remote): &(Option<IpAddr>, SocketAddr)) -> Self {
         local.map_or(Self::Remote(*remote), |local| Self::Both((local, *remote)))
     }
 }
 
-impl From<&(SocketAddr, Option<SocketAddr>)> for SocketAddrs {
-    fn from((local, remote): &(SocketAddr, Option<SocketAddr>)) -> Self {
+impl From<&(IpAddr, Option<SocketAddr>)> for SocketAddrs {
+    fn from((local, remote): &(IpAddr, Option<SocketAddr>)) -> Self {
         remote.map_or(Self::Local(*local), |remote| Self::Both((*local, remote)))
     }
 }
@@ -81,16 +81,16 @@ where
     let addrs = SocketAddrs::from(addrs);
     let local = match addrs {
         SocketAddrs::Local(local) | SocketAddrs::Both((local, _)) => local,
-        SocketAddrs::Remote(remote) => SocketAddr::new(
+        SocketAddrs::Remote(remote) => {
             if remote.is_ipv4() {
                 IpAddr::V4(Ipv4Addr::UNSPECIFIED)
             } else {
                 IpAddr::V6(Ipv6Addr::UNSPECIFIED)
-            },
-            0,
-        ),
+            }
+        }
     };
-    let socket = UdpSocket::bind(local)?;
+    // Let the OS choose an unused local port.
+    let socket = UdpSocket::bind(SocketAddr::new(local, 0))?;
     match addrs {
         SocketAddrs::Local(_) => {}
         SocketAddrs::Remote(remote) | SocketAddrs::Both((_, remote)) => {
@@ -402,25 +402,25 @@ mod test {
     #[test]
     fn loopback_v4_loopback_v4() {
         assert_eq!(
-            interface_and_mtu(&(local_v4(), local_v4())).unwrap(),
+            interface_and_mtu(&(local_v4().ip(), local_v4())).unwrap(),
             LOOPBACK
         );
     }
 
     #[test]
     fn loopback_v4_loopback_v6() {
-        assert!(interface_and_mtu(&(local_v4(), local_v6())).is_err());
+        assert!(interface_and_mtu(&(local_v4().ip(), local_v6())).is_err());
     }
 
     #[test]
     fn loopback_v6_loopback_v4() {
-        assert!(interface_and_mtu(&(local_v6(), local_v4())).is_err());
+        assert!(interface_and_mtu(&(local_v6().ip(), local_v4())).is_err());
     }
 
     #[test]
     fn loopback_v6_loopback_v6() {
         assert_eq!(
-            interface_and_mtu(&(local_v6(), local_v6())).unwrap(),
+            interface_and_mtu(&(local_v6().ip(), local_v6())).unwrap(),
             LOOPBACK
         );
     }
@@ -436,32 +436,38 @@ mod test {
 
     #[test]
     fn loopback_v4_none() {
-        assert_eq!(interface_and_mtu(&(local_v4(), None)).unwrap(), LOOPBACK);
+        assert_eq!(
+            interface_and_mtu(&(local_v4().ip(), None)).unwrap(),
+            LOOPBACK
+        );
     }
 
     #[test]
     fn loopback_v6_none() {
-        assert_eq!(interface_and_mtu(&(local_v6(), None)).unwrap(), LOOPBACK);
+        assert_eq!(
+            interface_and_mtu(&(local_v6().ip(), None)).unwrap(),
+            LOOPBACK
+        );
     }
 
     #[test]
     fn inet_v4_inet_v4() {
-        assert!(interface_and_mtu(&(inet_v4(), inet_v4())).is_err());
+        assert!(interface_and_mtu(&(inet_v4().ip(), inet_v4())).is_err());
     }
 
     #[test]
     fn inet_v4_inet_v6() {
-        assert!(interface_and_mtu(&(inet_v4(), inet_v6())).is_err());
+        assert!(interface_and_mtu(&(inet_v4().ip(), inet_v6())).is_err());
     }
 
     #[test]
     fn inet_v6_inet_v4() {
-        assert!(interface_and_mtu(&(inet_v6(), inet_v4())).is_err());
+        assert!(interface_and_mtu(&(inet_v6().ip(), inet_v4())).is_err());
     }
 
     #[test]
     fn inet_v6_inet_v6() {
-        assert!(interface_and_mtu(&(inet_v6(), inet_v6())).is_err());
+        assert!(interface_and_mtu(&(inet_v6().ip(), inet_v6())).is_err());
     }
     #[test]
     fn none_inet_v4() {
@@ -479,11 +485,11 @@ mod test {
 
     #[test]
     fn inet_v4_none() {
-        assert!(interface_and_mtu(&(inet_v4(), None)).is_err());
+        assert!(interface_and_mtu(&(inet_v4().ip(), None)).is_err());
     }
 
     #[test]
     fn inet_v6_none() {
-        assert!(interface_and_mtu(&(inet_v6(), None)).is_err());
+        assert!(interface_and_mtu(&(inet_v6().ip(), None)).is_err());
     }
 }
