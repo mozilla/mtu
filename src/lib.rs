@@ -6,11 +6,11 @@
 
 use std::{
     io::{Error, ErrorKind},
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, ToSocketAddrs, UdpSocket},
 };
 
 // Though the module includes `allow(clippy::all)`, that doesn't seem to affect some lints
-#[allow(clippy::semicolon_if_nothing_returned, clippy::struct_field_names)]
+// #[allow(clippy::semicolon_if_nothing_returned, clippy::struct_field_names)]
 #[cfg(windows)]
 mod win_bindings;
 
@@ -29,21 +29,52 @@ pub enum SocketAddrs {
     Both((SocketAddr, SocketAddr)),
 }
 
-impl From<&(SocketAddr, SocketAddr)> for SocketAddrs {
-    fn from((local, remote): &(SocketAddr, SocketAddr)) -> Self {
-        Self::Both((*local, *remote))
+fn to_socket_addr<T: ToSocketAddrs>(addrs: T) -> Result<SocketAddr, Error> {
+    addrs
+        .to_socket_addrs()?
+        .next()
+        .ok_or_else(|| Error::new(ErrorKind::InvalidInput, "No address found"))
+}
+
+impl<T> TryFrom<&(T, T)> for SocketAddrs
+where
+    T: ToSocketAddrs,
+{
+    type Error = Error;
+
+    fn try_from((local, remote): &(T, T)) -> Result<Self, Self::Error> {
+        Ok(Self::Both((
+            to_socket_addr(local)?,
+            to_socket_addr(remote)?,
+        )))
     }
 }
 
-impl From<&(Option<SocketAddr>, SocketAddr)> for SocketAddrs {
-    fn from((local, remote): &(Option<SocketAddr>, SocketAddr)) -> Self {
-        local.map_or(Self::Remote(*remote), |local| Self::Both((local, *remote)))
+impl<T> TryFrom<&(Option<T>, T)> for SocketAddrs
+where
+    T: ToSocketAddrs,
+{
+    type Error = Error;
+
+    fn try_from((local, remote): &(Option<T>, T)) -> Result<Self, Self::Error> {
+        Ok(match local {
+            Some(local) => Self::Both((to_socket_addr(local)?, to_socket_addr(remote)?)),
+            None => Self::Remote(to_socket_addr(remote)?),
+        })
     }
 }
 
-impl From<&(SocketAddr, Option<SocketAddr>)> for SocketAddrs {
-    fn from((local, remote): &(SocketAddr, Option<SocketAddr>)) -> Self {
-        remote.map_or(Self::Local(*local), |remote| Self::Both((*local, remote)))
+impl<T> TryFrom<&(T, Option<T>)> for SocketAddrs
+where
+    T: ToSocketAddrs,
+{
+    type Error = Error;
+
+    fn try_from((local, remote): &(T, Option<T>)) -> Result<Self, Self::Error> {
+        Ok(match remote {
+            Some(remote) => Self::Both((to_socket_addr(local)?, to_socket_addr(remote)?)),
+            None => Self::Local(to_socket_addr(local)?),
+        })
     }
 }
 
@@ -76,9 +107,12 @@ impl From<&(SocketAddr, Option<SocketAddr>)> for SocketAddrs {
 /// This function returns an error if the local interface MTU cannot be determined.
 pub fn interface_and_mtu<A>(addrs: A) -> Result<(String, usize), Error>
 where
-    SocketAddrs: From<A>,
+    SocketAddrs: TryFrom<A>,
 {
-    let addrs = SocketAddrs::from(addrs);
+    let addrs = match SocketAddrs::try_from(addrs) {
+        Ok(addrs) => addrs,
+        Err(_e) => return Err(Error::new(ErrorKind::InvalidInput, "No address found")),
+    };
     let local = match addrs {
         SocketAddrs::Local(mut local) | SocketAddrs::Both((mut local, _)) => {
             // Let the OS choose an unused local port.
@@ -401,6 +435,14 @@ mod test {
         socket_with_addr(IpAddr::V6(Ipv6Addr::new(
             0x26, 0x06, 0x47, 0x00, 0x68, 0x10, 0x84, 0xe5,
         )))
+    }
+
+    #[test]
+    fn loopback_v4_ip_loopback_v4() {
+        assert_eq!(
+            interface_and_mtu(&(local_v4().ip(), local_v4())).unwrap(),
+            LOOPBACK
+        );
     }
 
     #[test]
