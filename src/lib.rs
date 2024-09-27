@@ -4,9 +4,11 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+#[cfg(feature = "addr")]
+use std::net::{Ipv4Addr, Ipv6Addr};
 use std::{
     io::{Error, ErrorKind},
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket},
+    net::{IpAddr, SocketAddr, UdpSocket},
 };
 
 // Though the module includes `allow(clippy::all)`, that doesn't seem to affect some lints
@@ -74,6 +76,7 @@ impl From<&(SocketAddr, Option<SocketAddr>)> for SocketAddrs {
 /// # Errors
 ///
 /// This function returns an error if the local interface MTU cannot be determined.
+#[cfg(feature = "addr")]
 pub fn interface_and_mtu<A>(addrs: A) -> Result<(String, usize), Error>
 where
     SocketAddrs: From<A>,
@@ -98,6 +101,33 @@ where
         }
     }
     interface_and_mtu_impl(&socket)
+}
+
+/// Return the name and maximum transmission unit (MTU) of a local network interface.
+///
+/// Given a `UdpSocket`, return the name and maximum transmission unit (MTU) of the local network
+/// interface it uses.
+///
+/// The returned MTU may exceed the maximum IP packet size of 65,535 bytes on some
+/// platforms for some remote destinations. (For example, loopback destinations on
+/// Windows.)
+///
+/// The returned interface name is obtained from the operating system.
+///
+/// # Examples
+///
+/// ```
+/// let socket = std::net::UdpSocket::bind("127.0.0.1:12345").unwrap();
+/// socket.connect("127.0.0.1:8080").unwrap();
+/// let (name, mtu) = mtu::interface_and_mtu_of_socket(&socket).unwrap();
+/// println!("MTU is {mtu} on {name}");
+/// ```
+///
+/// # Errors
+///
+/// This function returns an error if the local interface MTU cannot be determined.
+pub fn interface_and_mtu_of_socket(socket: &UdpSocket) -> Result<(String, usize), Error> {
+    interface_and_mtu_impl(socket)
 }
 
 #[cfg(not(any(
@@ -324,13 +354,16 @@ fn interface_and_mtu_impl(socket: &UdpSocket) -> Result<(String, usize), Error> 
 mod test {
     use std::{
         env,
-        io::ErrorKind,
+        io::{Error, ErrorKind},
         net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket},
+        os::fd::FromRawFd,
     };
 
     use rand::Rng;
 
+    #[cfg(feature = "addr")]
     use crate::interface_and_mtu;
+    use crate::{interface_and_mtu_of_socket, SocketAddrs};
 
     #[derive(Debug)]
     struct NameMtu<'a>(Option<&'a str>, usize);
@@ -399,73 +432,103 @@ mod test {
         )))
     }
 
+    fn testcase<A>(addrs: A) -> Result<(String, usize), Error>
+    where
+        SocketAddrs: From<A>,
+        A: std::marker::Copy,
+    {
+        #[cfg(feature = "addr")]
+        let result_of_addrs = interface_and_mtu(addrs);
+
+        let addrs = SocketAddrs::from(addrs);
+        let local = match addrs {
+            SocketAddrs::Local(local) | SocketAddrs::Both((local, _)) => local,
+            SocketAddrs::Remote(remote) => SocketAddr::new(
+                if remote.is_ipv4() {
+                    IpAddr::V4(Ipv4Addr::UNSPECIFIED)
+                } else {
+                    IpAddr::V6(Ipv6Addr::UNSPECIFIED)
+                },
+                0,
+            ),
+        };
+        let socket = UdpSocket::bind(local)?;
+        match addrs {
+            SocketAddrs::Local(_) => {}
+            SocketAddrs::Remote(remote) | SocketAddrs::Both((_, remote)) => {
+                socket.connect(remote)?;
+            }
+        }
+        let result_of_socket = interface_and_mtu_of_socket(&socket);
+        #[cfg(feature = "addr")]
+        match result_of_socket {
+            Ok(ref result) => assert_eq!(result_of_addrs.unwrap(), *result),
+            Err(_) => assert!(result_of_addrs.is_err()),
+        }
+        result_of_socket
+    }
+
     #[test]
     fn loopback_v4_loopback_v4() {
-        assert_eq!(
-            interface_and_mtu(&(local_v4(), local_v4())).unwrap(),
-            LOOPBACK
-        );
+        assert_eq!(testcase(&(local_v4(), local_v4())).unwrap(), LOOPBACK);
     }
 
     #[test]
     fn loopback_v4_loopback_v6() {
-        assert!(interface_and_mtu(&(local_v4(), local_v6())).is_err());
+        assert!(testcase(&(local_v4(), local_v6())).is_err());
     }
 
     #[test]
     fn loopback_v6_loopback_v4() {
-        assert!(interface_and_mtu(&(local_v6(), local_v4())).is_err());
+        assert!(testcase(&(local_v6(), local_v4())).is_err());
     }
 
     #[test]
     fn loopback_v6_loopback_v6() {
-        assert_eq!(
-            interface_and_mtu(&(local_v6(), local_v6())).unwrap(),
-            LOOPBACK
-        );
+        assert_eq!(testcase(&(local_v6(), local_v6())).unwrap(), LOOPBACK);
     }
     #[test]
     fn none_loopback_v4() {
-        assert_eq!(interface_and_mtu(&(None, local_v4())).unwrap(), LOOPBACK);
+        assert_eq!(testcase(&(None, local_v4())).unwrap(), LOOPBACK);
     }
 
     #[test]
     fn none_loopback_v6() {
-        assert_eq!(interface_and_mtu(&(None, local_v6())).unwrap(), LOOPBACK);
+        assert_eq!(testcase(&(None, local_v6())).unwrap(), LOOPBACK);
     }
 
     #[test]
     fn loopback_v4_none() {
-        assert_eq!(interface_and_mtu(&(local_v4(), None)).unwrap(), LOOPBACK);
+        assert_eq!(testcase(&(local_v4(), None)).unwrap(), LOOPBACK);
     }
 
     #[test]
     fn loopback_v6_none() {
-        assert_eq!(interface_and_mtu(&(local_v6(), None)).unwrap(), LOOPBACK);
+        assert_eq!(testcase(&(local_v6(), None)).unwrap(), LOOPBACK);
     }
 
     #[test]
     fn inet_v4_inet_v4() {
-        assert!(interface_and_mtu(&(inet_v4(), inet_v4())).is_err());
+        assert!(testcase(&(inet_v4(), inet_v4())).is_err());
     }
 
     #[test]
     fn inet_v4_inet_v6() {
-        assert!(interface_and_mtu(&(inet_v4(), inet_v6())).is_err());
+        assert!(testcase(&(inet_v4(), inet_v6())).is_err());
     }
 
     #[test]
     fn inet_v6_inet_v4() {
-        assert!(interface_and_mtu(&(inet_v6(), inet_v4())).is_err());
+        assert!(testcase(&(inet_v6(), inet_v4())).is_err());
     }
 
     #[test]
     fn inet_v6_inet_v6() {
-        assert!(interface_and_mtu(&(inet_v6(), inet_v6())).is_err());
+        assert!(testcase(&(inet_v6(), inet_v6())).is_err());
     }
     #[test]
     fn none_inet_v4() {
-        assert_eq!(interface_and_mtu(&(None, inet_v4())).unwrap(), INET);
+        assert_eq!(testcase(&(None, inet_v4())).unwrap(), INET);
     }
 
     #[test]
@@ -474,16 +537,28 @@ mod test {
             // The GitHub CI environment does not have IPv6 connectivity.
             return;
         }
-        assert_eq!(interface_and_mtu(&(None, inet_v6())).unwrap(), INET);
+        assert_eq!(testcase(&(None, inet_v6())).unwrap(), INET);
     }
 
     #[test]
     fn inet_v4_none() {
-        assert!(interface_and_mtu(&(inet_v4(), None)).is_err());
+        assert!(testcase(&(inet_v4(), None)).is_err());
     }
 
     #[test]
     fn inet_v6_none() {
-        assert!(interface_and_mtu(&(inet_v6(), None)).is_err());
+        assert!(testcase(&(inet_v6(), None)).is_err());
+    }
+
+    #[test]
+    fn unbound() {
+        let socket = unsafe { UdpSocket::from_raw_fd(0) };
+        assert!(interface_and_mtu_of_socket(&socket).is_err());
+    }
+
+    #[test]
+    fn unconnected() {
+        let socket = UdpSocket::bind(local_v4()).unwrap();
+        assert_eq!(interface_and_mtu_of_socket(&socket).unwrap(), LOOPBACK);
     }
 }
