@@ -64,7 +64,10 @@ pub fn interface_and_mtu(remote: IpAddr) -> Result<(String, usize), Error> {
 
 #[cfg(test)]
 mod test {
-    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+    use std::{
+        env,
+        net::{IpAddr, Ipv4Addr, Ipv6Addr},
+    };
 
     use crate::interface_and_mtu;
 
@@ -118,6 +121,10 @@ mod test {
 
     #[test]
     fn inet_v6() {
+        if env::var("GITHUB_ACTIONS").is_ok() {
+            // The GitHub CI environment does not have IPv6 connectivity.
+            return;
+        }
         // cloudflare.com
         assert_eq!(
             interface_and_mtu(IpAddr::V6(Ipv6Addr::new(

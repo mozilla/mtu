@@ -14,6 +14,7 @@ use libc::{
 };
 
 use crate::default_err;
+
 pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> {
     // Open route socket.
     let fd = unsafe { socket(PF_ROUTE, SOCK_RAW, 0) };
