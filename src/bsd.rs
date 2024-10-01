@@ -5,7 +5,7 @@
 // except according to those terms.
 
 use core::str;
-use std::{ffi::c_void, io::Error, mem, net::IpAddr, ptr};
+use std::{ffi::c_void, io::Error, mem, mem::size_of, net::IpAddr, ptr};
 
 use libc::{
     close, getpid, read, rt_msghdr, sockaddr_dl, sockaddr_in, sockaddr_in6, sockaddr_storage,
@@ -14,11 +14,11 @@ use libc::{
 };
 
 use crate::default_err;
-
 pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> {
     // Open route socket.
     let fd = unsafe { socket(PF_ROUTE, SOCK_RAW, 0) };
     if fd == -1 {
+        eprintln!("socket error: {}", Error::last_os_error());
         return Err(Error::last_os_error());
     }
 
@@ -72,6 +72,7 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
     // Send route message.
     let res = unsafe { write(fd, msg.as_ptr().cast::<c_void>(), msg.len()) };
     if res == -1 {
+        eprintln!("write error: {}", Error::last_os_error());
         unsafe { close(fd) };
         return Err(Error::last_os_error());
     }
@@ -86,6 +87,7 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
     let rtm = loop {
         let len = unsafe { read(fd, buf.as_mut_ptr().cast::<c_void>(), buf.len()) };
         if len <= 0 {
+            eprintln!("read error: {}", Error::last_os_error());
             unsafe { close(fd) };
             return Err(Error::last_os_error());
         }
