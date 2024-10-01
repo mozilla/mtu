@@ -4,6 +4,9 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+// TODO: Remove this after `neli-proc-macros` starts using `syn@2`.
+#![allow(clippy::multiple_crate_versions)]
+
 use std::{
     io::{Error, ErrorKind},
     net::IpAddr,
