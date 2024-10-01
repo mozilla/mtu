@@ -19,9 +19,6 @@ rust-version = "1.76.0"
 # Don't increase beyond what Firefox is currently using: https://searchfox.org/mozilla-central/source/Cargo.lock
 libc = { version = "0.2", default-features = false }
 
-[dev-dependencies]
-rand = { version = "0.8", default-features = false, features = ["std", "std_rng"] }
-
 [target."cfg(windows)".dependencies]
 # Don't increase beyond what Firefox is currently using: https://searchfox.org/mozilla-central/source/Cargo.lock
 windows-core = "0.58"
