@@ -19,6 +19,8 @@ use std::{
 use bsd::interface_and_mtu_impl;
 #[cfg(target_os = "linux")]
 use linux::interface_and_mtu_impl;
+#[cfg(target_os = "windows")]
+use windows::interface_and_mtu_impl;
 
 #[cfg(any(
     target_os = "macos",
@@ -30,8 +32,9 @@ use linux::interface_and_mtu_impl;
 mod bsd;
 #[cfg(target_os = "linux")]
 mod linux;
-
-#[cfg(windows)]
+#[cfg(target_os = "windows")]
+mod windows;
+#[cfg(target_os = "windows")]
 mod win_bindings;
 
 /// Prepare a default error.

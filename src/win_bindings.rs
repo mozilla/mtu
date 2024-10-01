@@ -13,20 +13,17 @@ pub unsafe fn FreeMibTable(memory: *const core::ffi::c_void) {
     FreeMibTable(memory)
 }
 #[inline]
+pub unsafe fn GetBestInterfaceEx(pdestaddr: *const SOCKADDR, pdwbestifindex: *mut u32) -> u32 {
+    windows_targets::link!("iphlpapi.dll" "system" fn GetBestInterfaceEx(pdestaddr : *const SOCKADDR, pdwbestifindex : *mut u32) -> u32);
+    GetBestInterfaceEx(pdestaddr, pdwbestifindex)
+}
+#[inline]
 pub unsafe fn GetIpInterfaceTable(
     family: ADDRESS_FAMILY,
     table: *mut *mut MIB_IPINTERFACE_TABLE,
 ) -> WIN32_ERROR {
     windows_targets::link!("iphlpapi.dll" "system" fn GetIpInterfaceTable(family : ADDRESS_FAMILY, table : *mut *mut MIB_IPINTERFACE_TABLE) -> WIN32_ERROR);
     GetIpInterfaceTable(family, table)
-}
-#[inline]
-pub unsafe fn GetUnicastIpAddressTable(
-    family: ADDRESS_FAMILY,
-    table: *mut *mut MIB_UNICASTIPADDRESS_TABLE,
-) -> WIN32_ERROR {
-    windows_targets::link!("iphlpapi.dll" "system" fn GetUnicastIpAddressTable(family : ADDRESS_FAMILY, table : *mut *mut MIB_UNICASTIPADDRESS_TABLE) -> WIN32_ERROR);
-    GetUnicastIpAddressTable(family, table)
 }
 #[inline]
 pub unsafe fn if_indextoname(
@@ -209,44 +206,6 @@ impl Default for MIB_IPINTERFACE_TABLE {
 }
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct MIB_UNICASTIPADDRESS_ROW {
-    pub Address: SOCKADDR_INET,
-    pub InterfaceLuid: NET_LUID_LH,
-    pub InterfaceIndex: u32,
-    pub PrefixOrigin: NL_PREFIX_ORIGIN,
-    pub SuffixOrigin: NL_SUFFIX_ORIGIN,
-    pub ValidLifetime: u32,
-    pub PreferredLifetime: u32,
-    pub OnLinkPrefixLength: u8,
-    pub SkipAsSource: BOOLEAN,
-    pub DadState: NL_DAD_STATE,
-    pub ScopeId: SCOPE_ID,
-    pub CreationTimeStamp: i64,
-}
-impl windows_core::TypeKind for MIB_UNICASTIPADDRESS_ROW {
-    type TypeKind = windows_core::CopyType;
-}
-impl Default for MIB_UNICASTIPADDRESS_ROW {
-    fn default() -> Self {
-        unsafe { core::mem::zeroed() }
-    }
-}
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct MIB_UNICASTIPADDRESS_TABLE {
-    pub NumEntries: u32,
-    pub Table: [MIB_UNICASTIPADDRESS_ROW; 1],
-}
-impl windows_core::TypeKind for MIB_UNICASTIPADDRESS_TABLE {
-    type TypeKind = windows_core::CopyType;
-}
-impl Default for MIB_UNICASTIPADDRESS_TABLE {
-    fn default() -> Self {
-        unsafe { core::mem::zeroed() }
-    }
-}
-#[repr(C)]
-#[derive(Clone, Copy)]
 pub union NET_LUID_LH {
     pub Value: u64,
     pub Info: NET_LUID_LH_0,
@@ -270,17 +229,6 @@ impl windows_core::TypeKind for NET_LUID_LH_0 {
 impl Default for NET_LUID_LH_0 {
     fn default() -> Self {
         unsafe { core::mem::zeroed() }
-    }
-}
-#[repr(transparent)]
-#[derive(PartialEq, Eq, Copy, Clone, Default)]
-pub struct NL_DAD_STATE(pub i32);
-impl windows_core::TypeKind for NL_DAD_STATE {
-    type TypeKind = windows_core::CopyType;
-}
-impl core::fmt::Debug for NL_DAD_STATE {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_tuple("NL_DAD_STATE").field(&self.0).finish()
     }
 }
 #[repr(C)]
@@ -311,17 +259,6 @@ impl core::fmt::Debug for NL_LINK_LOCAL_ADDRESS_BEHAVIOR {
 }
 #[repr(transparent)]
 #[derive(PartialEq, Eq, Copy, Clone, Default)]
-pub struct NL_PREFIX_ORIGIN(pub i32);
-impl windows_core::TypeKind for NL_PREFIX_ORIGIN {
-    type TypeKind = windows_core::CopyType;
-}
-impl core::fmt::Debug for NL_PREFIX_ORIGIN {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_tuple("NL_PREFIX_ORIGIN").field(&self.0).finish()
-    }
-}
-#[repr(transparent)]
-#[derive(PartialEq, Eq, Copy, Clone, Default)]
 pub struct NL_ROUTER_DISCOVERY_BEHAVIOR(pub i32);
 impl windows_core::TypeKind for NL_ROUTER_DISCOVERY_BEHAVIOR {
     type TypeKind = windows_core::CopyType;
@@ -331,17 +268,6 @@ impl core::fmt::Debug for NL_ROUTER_DISCOVERY_BEHAVIOR {
         f.debug_tuple("NL_ROUTER_DISCOVERY_BEHAVIOR")
             .field(&self.0)
             .finish()
-    }
-}
-#[repr(transparent)]
-#[derive(PartialEq, Eq, Copy, Clone, Default)]
-pub struct NL_SUFFIX_ORIGIN(pub i32);
-impl windows_core::TypeKind for NL_SUFFIX_ORIGIN {
-    type TypeKind = windows_core::CopyType;
-}
-impl core::fmt::Debug for NL_SUFFIX_ORIGIN {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_tuple("NL_SUFFIX_ORIGIN").field(&self.0).finish()
     }
 }
 pub const NO_ERROR: WIN32_ERROR = WIN32_ERROR(0u32);
@@ -381,6 +307,20 @@ impl windows_core::TypeKind for SCOPE_ID_0_0 {
     type TypeKind = windows_core::CopyType;
 }
 impl Default for SCOPE_ID_0_0 {
+    fn default() -> Self {
+        unsafe { core::mem::zeroed() }
+    }
+}
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SOCKADDR {
+    pub sa_family: ADDRESS_FAMILY,
+    pub sa_data: [i8; 14],
+}
+impl windows_core::TypeKind for SOCKADDR {
+    type TypeKind = windows_core::CopyType;
+}
+impl Default for SOCKADDR {
     fn default() -> Self {
         unsafe { core::mem::zeroed() }
     }
