@@ -17,6 +17,8 @@ use std::{
     target_os = "openbsd",
 ))]
 use bsd::interface_and_mtu_impl;
+#[cfg(target_os = "linux")]
+use linux::interface_and_mtu_impl;
 
 #[cfg(any(
     target_os = "macos",
@@ -26,6 +28,8 @@ use bsd::interface_and_mtu_impl;
     target_os = "openbsd",
 ))]
 mod bsd;
+#[cfg(target_os = "linux")]
+mod linux;
 
 #[cfg(windows)]
 mod win_bindings;

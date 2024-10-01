@@ -19,7 +19,6 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
     // Open route socket.
     let fd = unsafe { socket(PF_ROUTE, SOCK_RAW, 0) };
     if fd == -1 {
-        eprintln!("socket error: {}", Error::last_os_error());
         return Err(Error::last_os_error());
     }
 
@@ -73,7 +72,6 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
     // Send route message.
     let res = unsafe { write(fd, msg.as_ptr().cast::<c_void>(), msg.len()) };
     if res == -1 {
-        eprintln!("write error: {}", Error::last_os_error());
         unsafe { close(fd) };
         return Err(Error::last_os_error());
     }
@@ -88,7 +86,6 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
     let rtm = loop {
         let len = unsafe { read(fd, buf.as_mut_ptr().cast::<c_void>(), buf.len()) };
         if len <= 0 {
-            eprintln!("read error: {}", Error::last_os_error());
             unsafe { close(fd) };
             return Err(Error::last_os_error());
         }
