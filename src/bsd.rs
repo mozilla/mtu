@@ -4,7 +4,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use core::str;
+use core::{slice, str};
 use std::{ffi::c_void, io::Error, mem, mem::size_of, net::IpAddr, ptr};
 
 use libc::{
@@ -15,6 +15,7 @@ use libc::{
 
 use crate::default_err;
 
+#[allow(clippy::too_many_lines)]
 pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> {
     // Open route socket.
     let fd = unsafe { socket(PF_ROUTE, SOCK_RAW, 0) };
@@ -24,26 +25,30 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
 
     // Prepare buffer with destination `sockaddr`.
     #[allow(clippy::cast_possible_truncation)]
-    let (remote, len) = match remote {
+    let dst: &[u8] = match remote {
         IpAddr::V4(ip) => {
             let mut sin: sockaddr_in = unsafe { mem::zeroed() };
             sin.sin_len = size_of::<sockaddr_in>() as u8;
             sin.sin_family = AF_INET as u8;
             sin.sin_addr.s_addr = u32::from_ne_bytes(ip.octets());
-            (
-                ptr::from_ref::<sockaddr_in>(&sin).cast::<u8>(),
-                size_of::<sockaddr_in>(),
-            )
+            unsafe {
+                slice::from_raw_parts(
+                    ptr::from_ref::<sockaddr_in>(&sin).cast::<u8>(),
+                    size_of::<sockaddr_in>(),
+                )
+            }
         }
         IpAddr::V6(ip) => {
             let mut sin6: sockaddr_in6 = unsafe { mem::zeroed() };
             sin6.sin6_len = size_of::<sockaddr_in6>() as u8;
             sin6.sin6_family = AF_INET6 as u8;
             sin6.sin6_addr.s6_addr = ip.octets();
-            (
-                ptr::from_ref::<sockaddr_in6>(&sin6).cast::<u8>(),
-                size_of::<sockaddr_in6>(),
-            )
+            unsafe {
+                slice::from_raw_parts(
+                    ptr::from_ref::<sockaddr_in6>(&sin6).cast::<u8>(),
+                    size_of::<sockaddr_in6>(),
+                )
+            }
         }
     };
 
@@ -51,7 +56,7 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
     let mut rtm: rt_msghdr = unsafe { mem::zeroed() };
     #[allow(clippy::cast_possible_truncation)]
     {
-        rtm.rtm_msglen = (size_of::<rt_msghdr>() + len) as u16; // Length includes sockaddr
+        rtm.rtm_msglen = (size_of::<rt_msghdr>() + dst.len()) as u16; // Length includes sockaddr
         rtm.rtm_version = RTM_VERSION as u8;
         rtm.rtm_type = RTM_GET as u8;
     }
@@ -66,7 +71,11 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
             msg.as_mut_ptr(),
             size_of::<rt_msghdr>(),
         );
-        ptr::copy_nonoverlapping(remote, msg.as_mut_ptr().add(size_of::<rt_msghdr>()), len);
+        ptr::copy_nonoverlapping(
+            dst.as_ptr(),
+            msg.as_mut_ptr().add(size_of::<rt_msghdr>()),
+            dst.len(),
+        );
     }
 
     // Send route message.
