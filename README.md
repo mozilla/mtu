@@ -4,16 +4,14 @@ A crate to return the name and maximum transmission unit (MTU) of the local netw
 
 ## Usage
 
-This crate exports a single function `interface_and_mtu` that, given a pair of local and remote `SocketAddr`s, returns the name and [maximum transmission unit (MTU)](https://en.wikipedia.org/wiki/Maximum_transmission_unit) of the local network interface used by a socket bound to the local address and connected towards the remote destination.
-
-If the local address is `None`, the function will let the operating system choose the local address based on the given remote address. If the remote address is `None`, the function will return the name and MTU of the local network interface with the given local address.
+This crate exports a single function `interface_and_mtu` that returns the name and [maximum transmission unit (MTU)](https://en.wikipedia.org/wiki/Maximum_transmission_unit) of the outgoing network interface towards a remote destination identified by an `IpAddr`,
 
 ## Example
 
 ```rust
-let saddr = "127.0.0.1:443".parse().unwrap();
-let (name, mtu) = mtu::interface_and_mtu(&(None, saddr)).unwrap();
-println!("MTU for {saddr:?} is {mtu} on {name}");
+let remote = "127.0.0.1".parse().unwrap();
+let (name, mtu) = mtu::interface_and_mtu(remote).unwrap();
+println!("MTU towards {remote:?} is {mtu} on {name}");
 ```
 
 ## Supported Platforms

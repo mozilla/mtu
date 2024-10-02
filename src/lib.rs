@@ -45,14 +45,11 @@ fn default_err() -> Error {
     Error::new(ErrorKind::NotFound, "Local interface MTU not found")
 }
 
-/// Return the name and maximum transmission unit (MTU) of a local network interface.
+/// Return the name and maximum transmission unit (MTU) of the outgoing network interface towards a
+/// remote destination identified by an [`IpAddr`],
 ///
-/// Given a remote [`IpAddr`], return the name and maximum transmission unit (MTU) of the local
-/// network interface towards the remote destination.
-///
-/// The returned MTU may exceed the maximum IP packet size of 65,535 bytes on some
-/// platforms for some remote destinations. (For example, loopback destinations on
-/// Windows.)
+/// The returned MTU may exceed the maximum IP packet size of 65,535 bytes on some platforms for
+/// some remote destinations. (For example, loopback destinations on Windows.)
 ///
 /// The returned interface name is obtained from the operating system.
 ///
@@ -67,7 +64,6 @@ fn default_err() -> Error {
 /// # Errors
 ///
 /// This function returns an error if the local interface MTU cannot be determined.
-// #[allow(clippy::missing_panics_doc, clippy::too_many_lines)]
 pub fn interface_and_mtu(remote: IpAddr) -> Result<(String, usize), Error> {
     interface_and_mtu_impl(remote)
 }
