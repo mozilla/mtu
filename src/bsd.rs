@@ -4,8 +4,13 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use core::{slice, str};
-use std::{ffi::c_void, io::Error, mem, mem::size_of, net::IpAddr, ptr};
+use std::{
+    ffi::c_void,
+    io::Error,
+    mem::{self, size_of},
+    net::IpAddr,
+    ptr, slice, str,
+};
 
 use libc::{
     close, getpid, read, rt_msghdr, sockaddr_dl, sockaddr_in, sockaddr_in6, sockaddr_storage,
@@ -15,7 +20,6 @@ use libc::{
 
 use crate::default_err;
 
-#[allow(clippy::too_many_lines)]
 pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> {
     // Open route socket.
     let fd = unsafe { socket(PF_ROUTE, SOCK_RAW, 0) };
@@ -24,42 +28,33 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
     }
 
     // Prepare buffer with destination `sockaddr`.
-    #[allow(clippy::cast_possible_truncation)]
-    let dst: &[u8] = match remote {
+    let mut dst: sockaddr_storage = unsafe { mem::zeroed() };
+    match remote {
         IpAddr::V4(ip) => {
-            let mut sin: sockaddr_in = unsafe { mem::zeroed() };
-            sin.sin_len = size_of::<sockaddr_in>() as u8;
-            sin.sin_family = AF_INET as u8;
+            let sin = unsafe { &mut *ptr::from_mut(&mut dst).cast::<sockaddr_in>() };
+            sin.sin_len = size_of::<sockaddr_in>()
+                .try_into()
+                .map_err(|_| default_err())?;
+            sin.sin_family = AF_INET.try_into().map_err(|_| default_err())?;
             sin.sin_addr.s_addr = u32::from_ne_bytes(ip.octets());
-            unsafe {
-                slice::from_raw_parts(
-                    ptr::from_ref::<sockaddr_in>(&sin).cast::<u8>(),
-                    size_of::<sockaddr_in>(),
-                )
-            }
         }
         IpAddr::V6(ip) => {
-            let mut sin6: sockaddr_in6 = unsafe { mem::zeroed() };
-            sin6.sin6_len = size_of::<sockaddr_in6>() as u8;
-            sin6.sin6_family = AF_INET6 as u8;
+            let sin6 = unsafe { &mut *ptr::from_mut(&mut dst).cast::<sockaddr_in6>() };
+            sin6.sin6_len = size_of::<sockaddr_in6>()
+                .try_into()
+                .map_err(|_| default_err())?;
+            sin6.sin6_family = AF_INET6.try_into().map_err(|_| default_err())?;
             sin6.sin6_addr.s6_addr = ip.octets();
-            unsafe {
-                slice::from_raw_parts(
-                    ptr::from_ref::<sockaddr_in6>(&sin6).cast::<u8>(),
-                    size_of::<sockaddr_in6>(),
-                )
-            }
         }
     };
 
     // Prepare route message structure.
     let mut rtm: rt_msghdr = unsafe { mem::zeroed() };
-    #[allow(clippy::cast_possible_truncation)]
-    {
-        rtm.rtm_msglen = (size_of::<rt_msghdr>() + dst.len()) as u16; // Length includes sockaddr
-        rtm.rtm_version = RTM_VERSION as u8;
-        rtm.rtm_type = RTM_GET as u8;
-    }
+    rtm.rtm_msglen = (size_of::<rt_msghdr>() + dst.ss_len as usize)
+        .try_into()
+        .map_err(|_| default_err())?; // Length includes sockaddr
+    rtm.rtm_version = RTM_VERSION.try_into().map_err(|_| default_err())?;
+    rtm.rtm_type = RTM_GET.try_into().map_err(|_| default_err())?;
     rtm.rtm_seq = fd; // Abuse file descriptor as sequence number, since it's unique
     rtm.rtm_addrs = RTA_DST | RTA_IFP; // Query for destination and obtain interface info
 
@@ -72,35 +67,38 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
             size_of::<rt_msghdr>(),
         );
         ptr::copy_nonoverlapping(
-            dst.as_ptr(),
+            ptr::from_ref::<sockaddr_storage>(&dst).cast::<u8>(),
             msg.as_mut_ptr().add(size_of::<rt_msghdr>()),
-            dst.len(),
+            dst.ss_len as usize,
         );
     }
 
     // Send route message.
     let res = unsafe { write(fd, msg.as_ptr().cast::<c_void>(), msg.len()) };
     if res == -1 {
+        let err = Error::last_os_error();
         unsafe { close(fd) };
-        return Err(Error::last_os_error());
+        return Err(err);
     }
 
     // Read route messages.
     let mut buf = vec![
         0u8;
         size_of::<rt_msghdr>() +
-        // There will never be `RTAX_MAX` sockaddrs, but it's a safe upper bound
+        // There will never be `RTAX_MAX` sockaddrs attached, but it's a safe upper bound.
          (RTAX_MAX as usize * size_of::<sockaddr_storage>())
     ];
     let rtm = loop {
         let len = unsafe { read(fd, buf.as_mut_ptr().cast::<c_void>(), buf.len()) };
         if len <= 0 {
+            let err = Error::last_os_error();
             unsafe { close(fd) };
-            return Err(Error::last_os_error());
+            return Err(err);
         }
         let rtm = unsafe { ptr::read_unaligned(buf.as_ptr().cast::<rt_msghdr>()) };
-        #[allow(clippy::cast_possible_truncation)]
-        if rtm.rtm_type == RTM_GET as u8 && rtm.rtm_pid == unsafe { getpid() } && rtm.rtm_seq == fd
+        if rtm.rtm_type == RTM_GET.try_into().map_err(|_| default_err())?
+            && rtm.rtm_pid == unsafe { getpid() }
+            && rtm.rtm_seq == fd
         {
             // This is the response we are looking for.
             break rtm;
@@ -118,12 +116,10 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
         if rtm.rtm_addrs & (1 << i) != 0 {
             // Check if the address is the interface address
             if i == RTAX_IFP {
-                if let Ok(name) = unsafe {
-                    str::from_utf8(std::slice::from_raw_parts(
-                        sdl.sdl_data.as_ptr().cast::<u8>(),
-                        sdl.sdl_nlen as usize,
-                    ))
-                } {
+                let name = unsafe {
+                    slice::from_raw_parts(sdl.sdl_data.as_ptr().cast::<u8>(), sdl.sdl_nlen as usize)
+                };
+                if let Ok(name) = str::from_utf8(name) {
                     // We have our interface name.
                     return Ok((name.to_string(), rtm.rtm_rmx.rmx_mtu as usize));
                 }
