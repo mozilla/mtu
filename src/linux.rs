@@ -48,10 +48,10 @@ fn addr_bytes(remote: &IpAddr) -> Vec<u8> {
 }
 
 pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> {
-    // Create a netlink socket
+    // Create a netlink socket.
     let mut socket = NlSocketHandle::connect(NlFamily::Route, None, &[])?;
 
-    // Send RTM_GETROUTE message to retrieve the route for the destination IP
+    // Send RTM_GETROUTE message to retrieve the route for the destination IP.
     let mut route_msg = Rtmsg {
         rtm_family: family(&remote),
         rtm_dst_len: addr_len(&remote),
@@ -69,7 +69,7 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
     let route_request = Nlmsghdr::new(
         None,
         Rtm::Getroute,
-        NlmFFlags::new(&[NlmF::Request, NlmF::Match]),
+        NlmFFlags::new(&[NlmF::Request, NlmF::Ack]),
         None,
         None,
         NlPayload::Payload(route_msg),
@@ -92,9 +92,12 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
         }
     }
     let ifindex = ifindex.ok_or_else(default_err)?;
-    println!("Interface Index: {ifindex}");
 
-    // Send RTM_GETLINK message to retrieve the interface details
+    // Create another netlink socket.
+    // TODO: Use the same socket for both requests. It's not clear why this is failing.
+    let mut socket = NlSocketHandle::connect(NlFamily::Route, None, &[])?;
+
+    // Send RTM_GETLINK message to retrieve the interface details.
     let link_msg = Ifinfomsg::new(
         family(&remote),
         Arphrd::None,
@@ -106,7 +109,7 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
     let link_request = Nlmsghdr::new(
         None,
         Rtm::Getlink,
-        NlmFFlags::new(&[NlmF::Dump, NlmF::Ack]),
+        NlmFFlags::new(&[NlmF::Request, NlmF::Ack]),
         None,
         None,
         NlPayload::Payload(link_msg),
