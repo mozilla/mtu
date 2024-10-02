@@ -7,17 +7,17 @@
 use std::{
     ffi::{c_void, CStr},
     io::Error,
+    mem,
     net::IpAddr,
     ptr, slice,
 };
 
 use crate::{
     default_err,
-    win_bindings::{
+    windows::win_bindings::{
         if_indextoname, FreeMibTable, GetBestInterfaceEx, GetIpInterfaceTable, AF_INET, AF_INET6,
         AF_UNSPEC, IN6_ADDR, IN6_ADDR_0, IN_ADDR, IN_ADDR_0, MIB_IPINTERFACE_ROW,
-        MIB_IPINTERFACE_TABLE, NO_ERROR, SOCKADDR, SOCKADDR_IN, SOCKADDR_IN6, SOCKADDR_IN6_0,
-        SOCKADDR_INET,
+        MIB_IPINTERFACE_TABLE, NO_ERROR, SOCKADDR, SOCKADDR_IN, SOCKADDR_IN6, SOCKADDR_INET,
     },
 };
 
@@ -27,40 +27,35 @@ mod win_bindings;
 
 pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> {
     // Convert remote to Windows SOCKADDR_INET format
-    let saddr = match remote {
-        IpAddr::V4(ip) => SOCKADDR_INET {
-            Ipv4: SOCKADDR_IN {
-                sin_family: AF_INET,
-                sin_port: 0,
-                sin_addr: IN_ADDR {
-                    S_un: IN_ADDR_0 {
-                        S_addr: u32::to_be(ip.into()),
-                    },
+    let mut dst: SOCKADDR_INET = unsafe { mem::zeroed() };
+    match remote {
+        IpAddr::V4(ip) => {
+            let sin = unsafe { &mut *ptr::from_mut(&mut dst).cast::<SOCKADDR_IN>() };
+            sin.sin_family = AF_INET;
+            sin.sin_addr = IN_ADDR {
+                S_un: IN_ADDR_0 {
+                    S_addr: u32::to_be(ip.into()),
                 },
-                sin_zero: [0; 8],
-            },
-        },
-        IpAddr::V6(ip) => SOCKADDR_INET {
-            Ipv6: SOCKADDR_IN6 {
-                sin6_family: AF_INET6,
-                sin6_port: 0,
-                sin6_flowinfo: 0,
-                sin6_addr: IN6_ADDR {
-                    u: IN6_ADDR_0 { Byte: ip.octets() },
-                },
-                Anonymous: SOCKADDR_IN6_0::default(),
-            },
-        },
-    };
+            }
+        }
+        IpAddr::V6(ip) => {
+            let sin6 = unsafe { &mut *ptr::from_mut(&mut dst).cast::<SOCKADDR_IN6>() };
+            sin6.sin6_family = AF_INET6;
+            sin6.sin6_addr = IN6_ADDR {
+                u: IN6_ADDR_0 { Byte: ip.octets() },
+            };
+        }
+    }
 
+    // Get the interface index of the best outbound interface towards `dst`.
     let mut idx = 0;
-    if unsafe {
+    let res = unsafe {
         GetBestInterfaceEx(
-            ptr::from_ref(&saddr).cast::<SOCKADDR>(),
+            ptr::from_ref(&dst).cast::<SOCKADDR>(),
             ptr::from_mut(&mut idx),
         )
-    } != 0
-    {
+    };
+    if res != 0 {
         return Err(Error::last_os_error());
     }
 
