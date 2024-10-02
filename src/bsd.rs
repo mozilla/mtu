@@ -130,13 +130,12 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
             }
             // Advance to the next address. The length is always a multiple of 4, so we need to do
             // some awkward manipulation.
-            sa = unsafe {
-                sa.add(if sdl.sdl_len == 0 {
-                    4
-                } else {
-                    ((sdl.sdl_len - 1) | 3) + 1
-                } as usize)
+            let incr = if sdl.sdl_len == 0 {
+                4
+            } else {
+                ((sdl.sdl_len - 1) | 3) + 1
             };
+            sa = unsafe { sa.add(incr as usize) };
         }
     }
 
