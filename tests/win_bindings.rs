@@ -35,4 +35,4 @@ fn codegen_windows_bindings() {
     }
 }
 
-const TARGET: &str = "src/win_bindings.rs";
+const TARGET: &str = "src/windows/win_bindings.rs";

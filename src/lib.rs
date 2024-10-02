@@ -38,11 +38,6 @@ mod bsd;
 mod linux;
 
 #[cfg(target_os = "windows")]
-// Though the module includes `allow(clippy::all)`, that doesn't seem to affect some lints
-#[allow(clippy::semicolon_if_nothing_returned, clippy::struct_field_names)]
-mod win_bindings;
-
-#[cfg(target_os = "windows")]
 mod windows;
 
 /// Prepare a default error.

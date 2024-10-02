@@ -21,6 +21,10 @@ use crate::{
     },
 };
 
+// Though the module includes `allow(clippy::all)`, that doesn't seem to affect some lints
+#[allow(clippy::semicolon_if_nothing_returned, clippy::struct_field_names)]
+mod win_bindings;
+
 pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> {
     // Convert remote to Windows SOCKADDR_INET format
     let saddr = match remote {
