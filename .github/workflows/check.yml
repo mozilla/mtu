@@ -84,7 +84,7 @@ jobs:
           else
             if [ "${{ startsWith(matrix.os, 'windows') && 'windows' || '' }}" == "windows" ]; then
               # The codegen_windows_bindings test only succeeds when run via llvm-cov?!
-              export FILTER="--skip codegen_windows_bindings"
+              export FILTER="-- --skip codegen_windows_bindings"
             fi
             cargo +${{ matrix.rust-toolchain }} test $BUILD_TYPE --no-fail-fast $FILTER
           fi
