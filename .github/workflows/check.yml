@@ -66,7 +66,7 @@ jobs:
         with:
           version: ${{ matrix.rust-toolchain }}
           components: ${{ matrix.rust-toolchain == 'stable' && 'llvm-tools-preview' || '' }} ${{ matrix.rust-toolchain == 'nightly' && 'rust-src' || '' }}
-          tools: ${{ matrix.rust-toolchain == 'stable' && 'cargo-llvm-cov, ' || '' }} cargo-nextest
+          tools: ${{ matrix.rust-toolchain == 'stable' && 'cargo-llvm-cov, ' || '' }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check
@@ -80,15 +80,13 @@ jobs:
         run: |
           # shellcheck disable=SC2086
           if [ "${{ matrix.rust-toolchain }}" == "stable" ] && [ "${{ matrix.type }}" == "debug" ] && [ "${{endsWith(matrix.os, '-latest') && 'latest' || '' }}" == "latest" ]; then
-            cargo +${{ matrix.rust-toolchain }} llvm-cov nextest $BUILD_TYPE --no-fail-fast --lcov --output-path lcov.info
+            cargo +${{ matrix.rust-toolchain }} llvm-cov test $BUILD_TYPE --no-fail-fast --lcov --output-path lcov.info
           else
             if [ "${{ startsWith(matrix.os, 'windows') && 'windows' || '' }}" == "windows" ]; then
               # The codegen_windows_bindings test only succeeds when run via llvm-cov?!
-              export FILTER="not test(codegen_windows_bindings)"
-            else
-              export FILTER="default()"
+              export FILTER="-- --skip codegen_windows_bindings"
             fi
-            cargo +${{ matrix.rust-toolchain }} nextest run $BUILD_TYPE --no-fail-fast -E "$FILTER"
+            cargo +${{ matrix.rust-toolchain }} test $BUILD_TYPE --no-fail-fast $FILTER
           fi
           cargo +${{ matrix.rust-toolchain }} bench --no-run
       - uses: codecov/codecov-action@e28ff129e5465c2c0dcc6f003fc735cb6ae0c673 # v4.5.0
@@ -116,7 +114,7 @@ jobs:
           fi
           for sanitizer in $SANITIZERS; do
             echo "Running tests with $sanitizer sanitizer..."
-            RUSTFLAGS="-Z sanitizer=$sanitizer" RUSTDOCFLAGS="-Z sanitizer=$sanitizer" cargo +nightly nextest run -Z build-std --target "$TARGET"
+            RUSTFLAGS="-Z sanitizer=$sanitizer" RUSTDOCFLAGS="-Z sanitizer=$sanitizer" cargo +nightly test -Z build-std --target "$TARGET"
           done
 
   clippy:
