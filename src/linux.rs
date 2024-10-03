@@ -76,26 +76,25 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
     );
     socket.send(route_request).or(Err(default_err()))?;
 
-    // Receive the response to RTM_GETROUTE
-    let response: Nlmsghdr<Rtm, Rtmsg> = socket
-        .recv()
-        .map_err(|_| default_err())?
-        .ok_or_else(default_err)?;
-    let route_attrs = &response.get_payload().map_err(|_| default_err())?.rtattrs;
+    // Receive all response to RTM_GETROUTE. (If we don't consume all responses, it seems like we
+    // cannot reuse it for another request.)
     let mut ifindex = None;
-    for attr in route_attrs.iter() {
-        if let Ok(index) = attr.get_payload_as::<i32>() {
-            if attr.rta_type == Rta::Oif {
-                ifindex = Some(index);
-                break;
+    for response in socket.iter(false) {
+        let header: Nlmsghdr<Rtm, Rtmsg> = response.map_err(|_| default_err())?;
+        if header.nl_type != Rtm::Newroute {
+            continue;
+        }
+        let route_attrs = &header.get_payload().map_err(|_| default_err())?.rtattrs;
+        for attr in route_attrs.iter() {
+            if let Ok(index) = attr.get_payload_as::<i32>() {
+                if attr.rta_type == Rta::Oif {
+                    ifindex = Some(index);
+                    break;
+                }
             }
         }
     }
     let ifindex = ifindex.ok_or_else(default_err)?;
-
-    // Create another netlink socket.
-    // TODO: Use the same socket for both requests. It's not clear why this is failing.
-    let mut socket = NlSocketHandle::connect(NlFamily::Route, None, &[])?;
 
     // Send RTM_GETLINK message to retrieve the interface details.
     let link_msg = Ifinfomsg::new(
@@ -116,25 +115,24 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
     );
     socket.send(link_request).or(Err(default_err()))?;
 
-    // Receive the response to RTM_GETLINK
-    let link_response: Nlmsghdr<Rtm, Ifinfomsg> = socket
-        .recv()
-        .map_err(|_| default_err())?
-        .ok_or_else(default_err)?;
-    let link_attrs = &link_response
-        .get_payload()
-        .map_err(|_| default_err())?
-        .rtattrs;
+    // Receive the responses to RTM_GETLINK.
     let mut ifname = None;
     let mut mtu = None;
-    for attr in link_attrs.iter() {
-        if attr.rta_type == Ifla::Ifname {
-            if let Ok(name) = attr.get_payload_as_with_len::<String>() {
-                ifname = Some(name);
-            }
-        } else if attr.rta_type == Ifla::Mtu {
-            if let Ok(mtu_val) = attr.get_payload_as::<u32>() {
-                mtu = Some(mtu_val as usize);
+    for response in socket.iter(false) {
+        let header: Nlmsghdr<Rtm, Ifinfomsg> = response.map_err(|_| default_err())?;
+        if header.nl_type != Rtm::Newlink {
+            continue;
+        }
+        let link_attrs = &header.get_payload().map_err(|_| default_err())?.rtattrs;
+        for attr in link_attrs.iter() {
+            if attr.rta_type == Ifla::Ifname {
+                if let Ok(name) = attr.get_payload_as_with_len::<String>() {
+                    ifname = Some(name);
+                }
+            } else if attr.rta_type == Ifla::Mtu {
+                if let Ok(mtu_val) = attr.get_payload_as::<u32>() {
+                    mtu = Some(mtu_val as usize);
+                }
             }
         }
     }
