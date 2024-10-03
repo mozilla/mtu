@@ -82,13 +82,7 @@ jobs:
           if [ "${{ matrix.rust-toolchain }}" == "stable" ] && [ "${{ matrix.type }}" == "debug" ] && [ "${{endsWith(matrix.os, '-latest') && 'latest' || '' }}" == "latest" ]; then
             cargo +${{ matrix.rust-toolchain }} llvm-cov test $BUILD_TYPE --no-fail-fast --lcov --output-path lcov.info
           else
-            if [ "${{ startsWith(matrix.os, 'windows') && 'windows' || '' }}" == "windows" ]; then
-              # The codegen_windows_bindings test only succeeds when run via llvm-cov?!
-              export FILTER="not test(codegen_windows_bindings)"
-            else
-              export FILTER="default()"
-            fi
-            cargo +${{ matrix.rust-toolchain }} test $BUILD_TYPE --no-fail-fast -E "$FILTER"
+            cargo +${{ matrix.rust-toolchain }} test $BUILD_TYPE --no-fail-fast
           fi
           cargo +${{ matrix.rust-toolchain }} bench --no-run
       - uses: codecov/codecov-action@e28ff129e5465c2c0dcc6f003fc735cb6ae0c673 # v4.5.0
