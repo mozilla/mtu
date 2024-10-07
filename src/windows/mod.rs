@@ -26,7 +26,7 @@ use crate::{
 mod win_bindings;
 
 pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> {
-    // Convert remote to Windows SOCKADDR_INET format
+    // Convert remote to Windows SOCKADDR_INET format.
     let mut dst: SOCKADDR_INET = unsafe { mem::zeroed() };
     match remote {
         IpAddr::V4(ip) => {
