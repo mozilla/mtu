@@ -234,7 +234,7 @@ jobs:
             RUST_LOG=trace cargo test --no-fail-fast
 
       - if: matrix.os == 'netbsd'
-        uses: vmactions/netbsd-vm@dd0161ecbb6386e562fd098acf367633501487a4
+        uses: vmactions/netbsd-vm@7c9086fdb4cc1aa814cda6e305390c2b966551a9
         with:
           usesh: true
           copyback: false
