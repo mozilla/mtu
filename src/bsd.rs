@@ -18,7 +18,7 @@ use libc::{
     RTM_VERSION, SOCK_RAW,
 };
 
-use crate::default_err;
+use crate::{default_err, next_item_aligned_by_four};
 
 pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> {
     // Open route socket.
@@ -124,13 +124,7 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
                     return Ok((name.to_string(), rtm.rtm_rmx.rmx_mtu as usize));
                 }
             }
-            // Advance to the next address. The length is always a multiple of 4, so we need to do
-            // some awkward manipulation.
-            let incr = if sdl.sdl_len == 0 {
-                4
-            } else {
-                ((sdl.sdl_len - 1) | 3) + 1
-            };
+            let incr = next_item_aligned_by_four(sdl.sdl_len as usize);
             sa = unsafe { sa.add(incr as usize) };
         }
     }

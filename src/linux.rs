@@ -14,7 +14,7 @@ use libc::{
     RTM_NEWROUTE, RTN_UNICAST, RT_SCOPE_UNIVERSE, RT_TABLE_MAIN, SOCK_RAW,
 };
 
-use crate::default_err;
+use crate::{default_err, next_item_aligned_by_four};
 
 #[allow(non_camel_case_types, clippy::struct_field_names)]
 #[repr(C)]
@@ -61,22 +61,26 @@ fn addr_bytes(remote: &IpAddr) -> Vec<u8> {
     }
 }
 
-#[allow(clippy::too_many_lines)]
+fn prepare_nlmsg(nl_type: c_ushort, nl_len: usize, nl_seq: u32) -> nlmsghdr {
+    nlmsghdr {
+        nlmsg_len: nl_len.try_into().map_err(|_| default_err()).unwrap(),
+        nlmsg_type: nl_type,
+        nlmsg_flags: (NLM_F_REQUEST | NLM_F_ACK)
+            .try_into()
+            .map_err(|_| default_err())
+            .unwrap(),
+        nlmsg_seq: nl_seq,
+        nlmsg_pid: 0,
+    }
+}
+
 fn if_index(remote: IpAddr, fd: i32) -> Result<i32, Error> {
     // Prepare RTM_GETROUTE message.
     let nl_msglen = mem::size_of::<nlmsghdr>()
         + mem::size_of::<rtmsg>()
         + mem::size_of::<rtattr>()
         + addr_bytes(&remote).len();
-    let nl_hdr = nlmsghdr {
-        nlmsg_len: nl_msglen.try_into().map_err(|_| default_err())?,
-        nlmsg_type: RTM_GETROUTE,
-        nlmsg_flags: (NLM_F_REQUEST | NLM_F_ACK)
-            .try_into()
-            .map_err(|_| default_err())?,
-        nlmsg_seq: 0,
-        nlmsg_pid: 0,
-    };
+    let nl_hdr = prepare_nlmsg(RTM_GETROUTE, nl_msglen, 0);
 
     let rt_msg = rtmsg {
         rtm_family: match remote {
@@ -179,21 +183,12 @@ fn if_index(remote: IpAddr, fd: i32) -> Result<i32, Error> {
     }
 }
 
-#[allow(clippy::too_many_lines)]
 fn if_name_mtu(if_index: i32, fd: i32) -> Result<(String, usize), Error> {
     // Prepare RTM_GETLINK message to get the interface name and MTU for the interface with the
     // obtained index.
 
     let nl_msglen = mem::size_of::<nlmsghdr>() + mem::size_of::<ifinfomsg>();
-    let nl_hdr = nlmsghdr {
-        nlmsg_len: nl_msglen.try_into().map_err(|_| default_err())?,
-        nlmsg_type: RTM_GETLINK,
-        nlmsg_flags: (NLM_F_REQUEST | NLM_F_ACK)
-            .try_into()
-            .map_err(|_| default_err())?,
-        nlmsg_seq: 1,
-        nlmsg_pid: 0,
-    };
+    let nl_hdr = prepare_nlmsg(RTM_GETLINK, nl_msglen, 1);
 
     let if_info_msg = ifinfomsg {
         ifi_family: AF_UNSPEC.try_into().map_err(|_| default_err())?,
@@ -278,15 +273,7 @@ fn if_name_mtu(if_index: i32, fd: i32) -> Result<(String, usize), Error> {
                         );
                     }
 
-                    // Advance to the next address. The length is always a multiple of 4, so we need
-                    // to do some awkward manipulation.
-                    let incr = if attr.rta_len == 0 {
-                        4
-                    } else {
-                        ((attr.rta_len - 1) | 3) + 1
-                    };
-                    // sa = unsafe { sa.add(incr as usize) };
-
+                    let incr = next_item_aligned_by_four(attr.rta_len as usize);
                     attr_ptr = unsafe { attr_ptr.add(incr as usize) };
                 }
                 if ifname.is_some() && mtu.is_some() {

@@ -42,6 +42,15 @@ fn default_err() -> Error {
     Error::new(ErrorKind::NotFound, "Local interface MTU not found")
 }
 
+/// Align a size to the next multiple of four.
+const fn next_item_aligned_by_four(size: usize) -> usize {
+    if size == 0 {
+        4
+    } else {
+        (size + 3) & !3
+    }
+}
+
 /// Return the name and maximum transmission unit (MTU) of the outgoing network interface towards a
 /// remote destination identified by an [`IpAddr`],
 ///
