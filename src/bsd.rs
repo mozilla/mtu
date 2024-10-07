@@ -124,7 +124,7 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
                     return Ok((name.to_string(), rtm.rtm_rmx.rmx_mtu as usize));
                 }
             }
-            let incr = next_item_aligned_by_four(sdl.sdl_len);
+            let incr = next_item_aligned_by_four(sdl.sdl_len.into());
             sa = unsafe { sa.add(incr as usize) };
         }
     }
