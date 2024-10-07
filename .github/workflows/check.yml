@@ -245,7 +245,7 @@ jobs:
             RUST_LOG=trace cargo test --no-fail-fast
 
       - if: matrix.os == 'solaris'
-        uses: vmactions/solaris-vm@960d7483ffd6ac03397964cf6423a2f41332c9c8
+        uses: vmactions/solaris-vm@a89b9438868c70db27e41625f0a5de6ff5e90809
         with:
           usesh: true
           copyback: false
