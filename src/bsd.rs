@@ -125,7 +125,7 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
                 }
             }
             let incr = next_item_aligned_by_four(sdl.sdl_len.into());
-            sa = unsafe { sa.add(incr as usize) };
+            sa = unsafe { sa.add(incr) };
         }
     }
 
