@@ -8,10 +8,10 @@ use core::str;
 use std::{io::Error, mem, net::IpAddr, ptr, slice};
 
 use libc::{
-    c_int, c_uchar, c_uint, c_ushort, close, nlmsghdr, recv, socket, write, AF_INET, AF_INET6,
-    AF_NETLINK, AF_UNSPEC, ARPHRD_NONE, IFLA_IFNAME, IFLA_MTU, MSG_DONTWAIT, NETLINK_ROUTE,
-    NLM_F_ACK, NLM_F_REQUEST, RTA_DST, RTA_OIF, RTM_GETLINK, RTM_GETROUTE, RTM_NEWLINK,
-    RTM_NEWROUTE, RTN_UNICAST, RT_SCOPE_UNIVERSE, RT_TABLE_MAIN, SOCK_RAW,
+    c_int, c_uchar, c_uint, c_ushort, close, nlmsghdr, read, socket, write, AF_INET, AF_INET6,
+    AF_NETLINK, AF_UNSPEC, ARPHRD_NONE, IFLA_IFNAME, IFLA_MTU, NETLINK_ROUTE, NLM_F_ACK,
+    NLM_F_REQUEST, RTA_DST, RTA_OIF, RTM_GETLINK, RTM_GETROUTE, RTM_NEWLINK, RTM_NEWROUTE,
+    RTN_UNICAST, RT_SCOPE_UNIVERSE, RT_TABLE_MAIN, SOCK_RAW,
 };
 
 use crate::{default_err, next_item_aligned_by_four};
@@ -104,28 +104,27 @@ fn if_index(remote: IpAddr, fd: i32) -> Result<i32, Error> {
         rta_type: RTA_DST,
     };
 
-    let mut buffer = vec![0u8; nl_msglen];
+    let mut buf = vec![0u8; nl_msglen];
     unsafe {
         ptr::copy_nonoverlapping(
             ptr::from_ref(&nl_hdr).cast(),
-            buffer.as_mut_ptr(),
+            buf.as_mut_ptr(),
             mem::size_of::<nlmsghdr>(),
         );
         ptr::copy_nonoverlapping(
             ptr::from_ref(&rt_msg).cast(),
-            buffer.as_mut_ptr().add(mem::size_of::<nlmsghdr>()),
+            buf.as_mut_ptr().add(mem::size_of::<nlmsghdr>()),
             mem::size_of::<rtmsg>(),
         );
         ptr::copy_nonoverlapping(
             ptr::from_ref(&rt_attr).cast(),
-            buffer
-                .as_mut_ptr()
+            buf.as_mut_ptr()
                 .add(mem::size_of::<nlmsghdr>() + mem::size_of::<rtmsg>()),
             mem::size_of::<rtattr>(),
         );
         ptr::copy_nonoverlapping(
             addr_bytes(&remote).as_ptr(),
-            buffer.as_mut_ptr().add(
+            buf.as_mut_ptr().add(
                 mem::size_of::<nlmsghdr>() + mem::size_of::<rtmsg>() + mem::size_of::<rtattr>(),
             ),
             addr_bytes(&remote).len(),
@@ -133,7 +132,7 @@ fn if_index(remote: IpAddr, fd: i32) -> Result<i32, Error> {
     };
 
     // Send RTM_GETROUTE message to get the interfce index associated with the destination.
-    if unsafe { write(fd, buffer.as_ptr().cast(), buffer.len()) } < 0 {
+    if unsafe { write(fd, buf.as_ptr().cast(), buf.len()) } < 0 {
         let err = Error::last_os_error();
         unsafe { close(fd) };
         return Err(err);
@@ -141,37 +140,26 @@ fn if_index(remote: IpAddr, fd: i32) -> Result<i32, Error> {
 
     // Receive RTM_GETROUTE response.
     loop {
-        let mut recv_buf = vec![0u8; 4096];
-        let recv_len = unsafe {
-            recv(
-                fd,
-                recv_buf.as_mut_ptr().cast(),
-                recv_buf.len(),
-                MSG_DONTWAIT,
-            )
-        };
-        if recv_len <= 0 {
+        let mut buf = vec![0u8; 4096];
+        let len = unsafe { read(fd, buf.as_mut_ptr().cast(), buf.len()) };
+        if len < 0 {
             return Err(Error::last_os_error());
         }
 
         let mut offset = 0;
-        while offset < recv_len.try_into().map_err(|_| default_err())? {
-            let hdr =
-                unsafe { ptr::read_unaligned(recv_buf.as_ptr().add(offset).cast::<nlmsghdr>()) };
+        while offset < len.try_into().map_err(|_| default_err())? {
+            let hdr = unsafe { ptr::read_unaligned(buf.as_ptr().add(offset).cast::<nlmsghdr>()) };
             if hdr.nlmsg_seq == 0 && hdr.nlmsg_type == RTM_NEWROUTE {
                 let mut attr_ptr = unsafe {
-                    recv_buf
-                        .as_ptr()
+                    buf.as_ptr()
                         .add(offset + mem::size_of::<nlmsghdr>() + mem::size_of::<rtmsg>())
                 };
-                let attr_end = unsafe { recv_buf.as_ptr().add(offset + hdr.nlmsg_len as usize) };
+                let attr_end = unsafe { buf.as_ptr().add(offset + hdr.nlmsg_len as usize) };
                 while attr_ptr < attr_end {
                     let attr = unsafe { ptr::read_unaligned(attr_ptr.cast::<rtattr>()) };
                     if attr.rta_type == RTA_OIF {
                         let idx = unsafe {
-                            ptr::read_unaligned(
-                                attr_ptr.add(mem::size_of::<rtattr>()).cast::<i32>(),
-                            )
+                            ptr::read_unaligned(attr_ptr.add(mem::size_of::<rtattr>()).cast())
                         };
                         return Ok(idx);
                     }
@@ -198,22 +186,22 @@ fn if_name_mtu(if_index: i32, fd: i32) -> Result<(String, usize), Error> {
         ifi_change: 0,
     };
 
-    let mut buffer = vec![0u8; nl_msglen];
+    let mut buf = vec![0u8; nl_msglen];
     unsafe {
         ptr::copy_nonoverlapping(
             ptr::from_ref(&nl_hdr).cast(),
-            buffer.as_mut_ptr(),
+            buf.as_mut_ptr(),
             mem::size_of::<nlmsghdr>(),
         );
         ptr::copy_nonoverlapping(
             std::ptr::from_ref(&if_info_msg).cast(),
-            buffer.as_mut_ptr().add(mem::size_of::<nlmsghdr>()),
+            buf.as_mut_ptr().add(mem::size_of::<nlmsghdr>()),
             mem::size_of::<ifinfomsg>(),
         );
     }
 
     // Send RTM_GETLINK message.
-    if unsafe { write(fd, buffer.as_ptr().cast(), buffer.len()) } < 0 {
+    if unsafe { write(fd, buf.as_ptr().cast(), buf.len()) } < 0 {
         let err = Error::last_os_error();
         unsafe { close(fd) };
         return Err(err);
@@ -223,30 +211,21 @@ fn if_name_mtu(if_index: i32, fd: i32) -> Result<(String, usize), Error> {
     let mut ifname = None;
     let mut mtu = None;
     'recv: loop {
-        let mut recv_buf = vec![0u8; 4096];
-        let recv_len = unsafe {
-            recv(
-                fd,
-                recv_buf.as_mut_ptr().cast(),
-                recv_buf.len(),
-                MSG_DONTWAIT,
-            )
-        };
-        if recv_len <= 0 {
+        let mut buf = vec![0u8; 4096];
+        let len = unsafe { read(fd, buf.as_mut_ptr().cast(), buf.len()) };
+        if len < 0 {
             return Err(Error::last_os_error());
         }
 
         let mut offset = 0;
-        while offset < recv_len.try_into().map_err(|_| default_err())? {
-            let hdr =
-                unsafe { ptr::read_unaligned(recv_buf.as_ptr().add(offset).cast::<nlmsghdr>()) };
+        while offset < len.try_into().map_err(|_| default_err())? {
+            let hdr = unsafe { ptr::read_unaligned(buf.as_ptr().add(offset).cast::<nlmsghdr>()) };
             if hdr.nlmsg_seq == 1 && hdr.nlmsg_type == RTM_NEWLINK {
                 let mut attr_ptr = unsafe {
-                    recv_buf
-                        .as_ptr()
+                    buf.as_ptr()
                         .add(offset + mem::size_of::<nlmsghdr>() + mem::size_of::<ifinfomsg>())
                 };
-                let attr_end = unsafe { recv_buf.as_ptr().add(offset + hdr.nlmsg_len as usize) };
+                let attr_end = unsafe { buf.as_ptr().add(offset + hdr.nlmsg_len as usize) };
 
                 while attr_ptr < attr_end {
                     let attr = unsafe { ptr::read_unaligned(attr_ptr.cast::<rtattr>()) };
@@ -284,11 +263,11 @@ fn if_name_mtu(if_index: i32, fd: i32) -> Result<(String, usize), Error> {
         }
     }
 
-    let ifname =
+    let name =
         ifname.ok_or_else(|| Error::new(std::io::ErrorKind::Other, "Interface name not found"))?;
     let mtu = mtu.ok_or_else(|| Error::new(std::io::ErrorKind::Other, "MTU not found"))?;
 
-    Ok((ifname, mtu))
+    Ok((name, mtu))
 }
 
 pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> {

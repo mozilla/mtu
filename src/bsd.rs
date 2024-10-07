@@ -5,7 +5,6 @@
 // except according to those terms.
 
 use std::{
-    ffi::c_void,
     io::Error,
     mem::{self, size_of},
     net::IpAddr,
@@ -62,19 +61,19 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
     let mut msg: Vec<u8> = vec![0; rtm.rtm_msglen as usize];
     unsafe {
         ptr::copy_nonoverlapping(
-            ptr::from_ref::<rt_msghdr>(&rtm).cast::<u8>(),
+            ptr::from_ref::<rt_msghdr>(&rtm).cast(),
             msg.as_mut_ptr(),
             size_of::<rt_msghdr>(),
         );
         ptr::copy_nonoverlapping(
-            ptr::from_ref::<sockaddr_storage>(&dst).cast::<u8>(),
+            ptr::from_ref::<sockaddr_storage>(&dst).cast(),
             msg.as_mut_ptr().add(size_of::<rt_msghdr>()),
             dst.ss_len as usize,
         );
     }
 
     // Send route message.
-    let res = unsafe { write(fd, msg.as_ptr().cast::<c_void>(), msg.len()) };
+    let res = unsafe { write(fd, msg.as_ptr().cast(), msg.len()) };
     if res == -1 {
         let err = Error::last_os_error();
         unsafe { close(fd) };
@@ -89,7 +88,7 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
          (RTAX_MAX as usize * size_of::<sockaddr_storage>())
     ];
     let rtm = loop {
-        let len = unsafe { read(fd, buf.as_mut_ptr().cast::<c_void>(), buf.len()) };
+        let len = unsafe { read(fd, buf.as_mut_ptr().cast(), buf.len()) };
         if len <= 0 {
             let err = Error::last_os_error();
             unsafe { close(fd) };
@@ -117,7 +116,7 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
             // Check if the address is the interface address
             if i == RTAX_IFP {
                 let name = unsafe {
-                    slice::from_raw_parts(sdl.sdl_data.as_ptr().cast::<u8>(), sdl.sdl_nlen as usize)
+                    slice::from_raw_parts(sdl.sdl_data.as_ptr().cast(), sdl.sdl_nlen as usize)
                 };
                 if let Ok(name) = str::from_utf8(name) {
                     // We have our interface name.
