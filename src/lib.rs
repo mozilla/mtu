@@ -43,6 +43,7 @@ fn default_err() -> Error {
 }
 
 /// Align a size to the next multiple of four.
+#[cfg(not(target_os = "windows"))]
 const fn next_item_aligned_by_four(size: usize) -> usize {
     if size == 0 {
         4

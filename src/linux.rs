@@ -274,7 +274,7 @@ fn if_name_mtu(if_index: i32, fd: i32) -> Result<(String, usize), Error> {
                     }
 
                     let incr = next_item_aligned_by_four(attr.rta_len as usize);
-                    attr_ptr = unsafe { attr_ptr.add(incr as usize) };
+                    attr_ptr = unsafe { attr_ptr.add(incr) };
                 }
                 if ifname.is_some() && mtu.is_some() {
                     break 'recv;
