@@ -1,2 +1,0 @@
-# TODO: Remove this after `neli-proc-macros` starts using `syn@2`.
-allowed-duplicate-crates = ["syn"]
