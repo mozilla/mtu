@@ -61,12 +61,12 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
     let mut msg: Vec<u8> = vec![0; rtm.rtm_msglen as usize];
     unsafe {
         ptr::copy_nonoverlapping(
-            ptr::from_ref::<rt_msghdr>(&rtm).cast(),
+            ptr::from_ref(&rtm).cast(),
             msg.as_mut_ptr(),
             size_of::<rt_msghdr>(),
         );
         ptr::copy_nonoverlapping(
-            ptr::from_ref::<sockaddr_storage>(&dst).cast(),
+            ptr::from_ref(&dst).cast(),
             msg.as_mut_ptr().add(size_of::<rt_msghdr>()),
             dst.ss_len as usize,
         );
