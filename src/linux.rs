@@ -232,8 +232,9 @@ fn if_name_mtu(if_index: i32, fd: i32) -> Result<(String, usize), Error> {
                 while attr_ptr < attr_end {
                     let attr = unsafe { ptr::read_unaligned(attr_ptr.cast::<rtattr>()) };
                     if attr.rta_type == IFLA_IFNAME {
-                        let name =
-                            unsafe { CStr::from_ptr(attr_ptr.add(mem::size_of::<rtattr>())) };
+                        let name = unsafe {
+                            CStr::from_ptr(attr_ptr.add(mem::size_of::<rtattr>()).cast())
+                        };
                         if let Ok(name) = name.to_str() {
                             // We have our interface name.
                             ifname = Some(name.to_string());
