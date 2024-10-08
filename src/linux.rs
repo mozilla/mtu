@@ -4,12 +4,12 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use core::str;
 use std::{
+    ffi::CStr,
     io::{Error, ErrorKind},
     mem,
     net::IpAddr,
-    ptr, slice,
+    ptr,
 };
 
 use libc::{
@@ -20,6 +20,8 @@ use libc::{
 };
 
 use crate::{default_err, next_item_aligned_by_four};
+
+const NETLINK_BUFFER_SIZE: usize = 8192; // See netlink(7) man page.
 
 #[allow(non_camel_case_types, clippy::struct_field_names)]
 #[repr(C)]
@@ -66,24 +68,29 @@ fn addr_bytes(remote: &IpAddr) -> Vec<u8> {
     }
 }
 
-fn prepare_nlmsg(nl_type: c_ushort, nl_len: usize, nl_seq: u32) -> Result<nlmsghdr, Error> {
+fn prepare_nlmsg(
+    nlmsg_type: c_ushort,
+    nlmsg_len: usize,
+    nlmsg_seq: u32,
+) -> Result<nlmsghdr, Error> {
     let mut nlm = unsafe { mem::zeroed::<nlmsghdr>() };
-    nlm.nlmsg_len = nl_len.try_into().map_err(|_| default_err())?;
-    nlm.nlmsg_type = nl_type;
+    nlm.nlmsg_len = nlmsg_len.try_into().map_err(|_| default_err())?;
+    nlm.nlmsg_type = nlmsg_type;
     nlm.nlmsg_flags = (NLM_F_REQUEST | NLM_F_ACK)
         .try_into()
         .map_err(|_| default_err())?;
-    nlm.nlmsg_seq = nl_seq;
+    nlm.nlmsg_seq = nlmsg_seq;
     Ok(nlm)
 }
 
 fn if_index(remote: IpAddr, fd: i32) -> Result<i32, Error> {
     // Prepare RTM_GETROUTE message.
-    let nl_msglen = mem::size_of::<nlmsghdr>()
+    let nlmsg_len = mem::size_of::<nlmsghdr>()
         + mem::size_of::<rtmsg>()
         + mem::size_of::<rtattr>()
         + addr_bytes(&remote).len();
-    let nl_hdr = prepare_nlmsg(RTM_GETROUTE, nl_msglen, 0)?;
+    let nlmsg_seq = 1;
+    let hdr = prepare_nlmsg(RTM_GETROUTE, nlmsg_len, nlmsg_seq)?;
 
     let mut rtm = unsafe { mem::zeroed::<rtmsg>() };
     rtm.rtm_family = match remote {
@@ -95,16 +102,16 @@ fn if_index(remote: IpAddr, fd: i32) -> Result<i32, Error> {
     rtm.rtm_scope = RT_SCOPE_UNIVERSE;
     rtm.rtm_type = RTN_UNICAST;
 
-    let mut rta = unsafe { mem::zeroed::<rtattr>() };
-    rta.rta_len = (mem::size_of::<rtattr>() + addr_bytes(&remote).len())
+    let mut attr = unsafe { mem::zeroed::<rtattr>() };
+    attr.rta_len = (mem::size_of::<rtattr>() + addr_bytes(&remote).len())
         .try_into()
         .map_err(|_| default_err())?;
-    rta.rta_type = RTA_DST;
+    attr.rta_type = RTA_DST;
 
-    let mut buf = vec![0u8; nl_msglen];
+    let mut buf = vec![0u8; nlmsg_len];
     unsafe {
         ptr::copy_nonoverlapping(
-            ptr::from_ref(&nl_hdr).cast(),
+            ptr::from_ref(&hdr).cast(),
             buf.as_mut_ptr(),
             mem::size_of::<nlmsghdr>(),
         );
@@ -114,7 +121,7 @@ fn if_index(remote: IpAddr, fd: i32) -> Result<i32, Error> {
             mem::size_of::<rtmsg>(),
         );
         ptr::copy_nonoverlapping(
-            ptr::from_ref(&rta).cast(),
+            ptr::from_ref(&attr).cast(),
             buf.as_mut_ptr()
                 .add(mem::size_of::<nlmsghdr>() + mem::size_of::<rtmsg>()),
             mem::size_of::<rtattr>(),
@@ -137,7 +144,7 @@ fn if_index(remote: IpAddr, fd: i32) -> Result<i32, Error> {
 
     // Receive RTM_GETROUTE response.
     loop {
-        let mut buf = vec![0u8; 4096];
+        let mut buf = vec![0u8; NETLINK_BUFFER_SIZE];
         let len = unsafe { read(fd, buf.as_mut_ptr().cast(), buf.len()) };
         if len < 0 {
             return Err(Error::last_os_error());
@@ -146,7 +153,8 @@ fn if_index(remote: IpAddr, fd: i32) -> Result<i32, Error> {
         let mut offset = 0;
         while offset < len.try_into().map_err(|_| default_err())? {
             let hdr = unsafe { ptr::read_unaligned(buf.as_ptr().add(offset).cast::<nlmsghdr>()) };
-            if hdr.nlmsg_seq == 0 && hdr.nlmsg_type == RTM_NEWROUTE {
+            if hdr.nlmsg_seq == nlmsg_seq && hdr.nlmsg_type == RTM_NEWROUTE {
+                // This is the response, parse through the attributes to find the interface index.
                 let mut attr_ptr = unsafe {
                     buf.as_ptr()
                         .add(offset + mem::size_of::<nlmsghdr>() + mem::size_of::<rtmsg>())
@@ -155,6 +163,7 @@ fn if_index(remote: IpAddr, fd: i32) -> Result<i32, Error> {
                 while attr_ptr < attr_end {
                     let attr = unsafe { ptr::read_unaligned(attr_ptr.cast::<rtattr>()) };
                     if attr.rta_type == RTA_OIF {
+                        // We have our interface index.
                         let idx = unsafe {
                             ptr::read_unaligned(attr_ptr.add(mem::size_of::<rtattr>()).cast())
                         };
@@ -171,19 +180,19 @@ fn if_index(remote: IpAddr, fd: i32) -> Result<i32, Error> {
 fn if_name_mtu(if_index: i32, fd: i32) -> Result<(String, usize), Error> {
     // Prepare RTM_GETLINK message to get the interface name and MTU for the interface with the
     // obtained index.
-
-    let nl_msglen = mem::size_of::<nlmsghdr>() + mem::size_of::<ifinfomsg>();
-    let nl_hdr = prepare_nlmsg(RTM_GETLINK, nl_msglen, 1)?;
+    let nlmsg_len = mem::size_of::<nlmsghdr>() + mem::size_of::<ifinfomsg>();
+    let nlmsg_seq = 2;
+    let hdr = prepare_nlmsg(RTM_GETLINK, nlmsg_len, nlmsg_seq)?;
 
     let mut ifim: ifinfomsg = unsafe { mem::zeroed() };
     ifim.ifi_family = AF_UNSPEC.try_into().map_err(|_| default_err())?;
     ifim.ifi_type = ARPHRD_NONE;
     ifim.ifi_index = if_index;
 
-    let mut buf = vec![0u8; nl_msglen];
+    let mut buf = vec![0u8; nlmsg_len];
     unsafe {
         ptr::copy_nonoverlapping(
-            ptr::from_ref(&nl_hdr).cast(),
+            ptr::from_ref(&hdr).cast(),
             buf.as_mut_ptr(),
             mem::size_of::<nlmsghdr>(),
         );
@@ -205,7 +214,7 @@ fn if_name_mtu(if_index: i32, fd: i32) -> Result<(String, usize), Error> {
     let mut ifname = None;
     let mut mtu = None;
     'recv: loop {
-        let mut buf = vec![0u8; 4096];
+        let mut buf = vec![0u8; NETLINK_BUFFER_SIZE];
         let len = unsafe { read(fd, buf.as_mut_ptr().cast(), buf.len()) };
         if len < 0 {
             return Err(Error::last_os_error());
@@ -214,23 +223,18 @@ fn if_name_mtu(if_index: i32, fd: i32) -> Result<(String, usize), Error> {
         let mut offset = 0;
         while offset < len.try_into().map_err(|_| default_err())? {
             let hdr = unsafe { ptr::read_unaligned(buf.as_ptr().add(offset).cast::<nlmsghdr>()) };
-            if hdr.nlmsg_seq == 1 && hdr.nlmsg_type == RTM_NEWLINK {
+            if hdr.nlmsg_seq == nlmsg_seq && hdr.nlmsg_type == RTM_NEWLINK {
                 let mut attr_ptr = unsafe {
                     buf.as_ptr()
                         .add(offset + mem::size_of::<nlmsghdr>() + mem::size_of::<ifinfomsg>())
                 };
                 let attr_end = unsafe { buf.as_ptr().add(offset + hdr.nlmsg_len as usize) };
-
                 while attr_ptr < attr_end {
                     let attr = unsafe { ptr::read_unaligned(attr_ptr.cast::<rtattr>()) };
                     if attr.rta_type == IFLA_IFNAME {
-                        let name = unsafe {
-                            slice::from_raw_parts(
-                                attr_ptr.add(mem::size_of::<rtattr>()),
-                                attr.rta_len as usize - mem::size_of::<rtattr>() - 1,
-                            )
-                        };
-                        if let Ok(name) = str::from_utf8(name) {
+                        let name =
+                            unsafe { CStr::from_ptr(attr_ptr.add(mem::size_of::<rtattr>())) };
+                        if let Ok(name) = name.to_str() {
                             // We have our interface name.
                             ifname = Some(name.to_string());
                         }
@@ -245,12 +249,11 @@ fn if_name_mtu(if_index: i32, fd: i32) -> Result<(String, usize), Error> {
                             .map_err(|_| default_err())?,
                         );
                     }
-
+                    if ifname.is_some() && mtu.is_some() {
+                        break 'recv;
+                    }
                     let incr = next_item_aligned_by_four(attr.rta_len as usize);
                     attr_ptr = unsafe { attr_ptr.add(incr) };
-                }
-                if ifname.is_some() && mtu.is_some() {
-                    break 'recv;
                 }
             }
             offset += hdr.nlmsg_len as usize;
@@ -259,7 +262,6 @@ fn if_name_mtu(if_index: i32, fd: i32) -> Result<(String, usize), Error> {
 
     let name = ifname.ok_or_else(|| Error::new(ErrorKind::Other, "Interface name not found"))?;
     let mtu = mtu.ok_or_else(|| Error::new(ErrorKind::Other, "MTU not found"))?;
-
     Ok((name, mtu))
 }
 
