@@ -1,6 +1,12 @@
-# MTU
+[![Coverage Status](https://codecov.io/gh/mozilla/mtu/branch/main/graph/badge.svg)](https://codecov.io/gh/mozilla/mtu)
+[![Average time to resolve an issue](https://isitmaintained.com/badge/resolution/mozilla/mtu.svg)](https://isitmaintained.com/project/mozilla/mtu "Average time to resolve an issue")
+[![Percentage of issues still open](https://isitmaintained.com/badge/open/mozilla/mtu.svg)](https://isitmaintained.com/project/mozilla/mtu "Percentage of issues still open")
+![Maintenance](https://img.shields.io/badge/maintenance-activly--developed-brightgreen.svg)
 
-A crate to return the name and maximum transmission unit (MTU) of the local network interface towards a given destination `SocketAddr`, optionally from a given local `SocketAddr`.
+# mtu
+
+A crate to return the name and maximum transmission unit (MTU) of the local network interface
+towards a given destination `SocketAddr`, optionally from a given local `SocketAddr`.
 
 ## Usage
 
@@ -24,10 +30,14 @@ FreeBSD, NetBSD and OpenBSD support is waiting for [rust/libc#3714](https://gith
 
 ## Notes
 
-The returned MTU may exceed the maximum IP packet size of 65,535 bytes on some platforms for some remote destinations. (For example, loopback destinations on Windows.)
+The returned MTU may exceed the maximum IP packet size of 65,535 bytes on some platforms for
+some remote destinations. (For example, loopback destinations on Windows.)
 
 The returned interface name is obtained from the operating system.
 
 ## Contributing
 
-We're happy to receive PRs that improve this crate. Please take a look at our [community guidelines](CODE_OF_CONDUCT.md) beforehand.
+We're happy to receive PRs that improve this crate. Please take a look at our [community
+guidelines](CODE_OF_CONDUCT.md) beforehand.
+
+License: MIT OR Apache-2.0
