@@ -160,12 +160,12 @@ fn interface_and_mtu_impl(_socket: &UdpSocket) -> Result<(String, usize), Error>
     target_os = "linux"
 ))]
 fn interface_and_mtu_impl(socket: &UdpSocket) -> Result<(String, usize), Error> {
-    #[cfg(target_os = "linux")]
-    use std::{ffi::c_char, mem, os::fd::AsRawFd};
     use std::{
         ffi::{c_int, CStr},
         ptr,
     };
+    #[cfg(target_os = "linux")]
+    use std::{mem, os::fd::AsRawFd};
 
     use libc::{
         freeifaddrs, getifaddrs, ifaddrs, in_addr_t, sockaddr_in, sockaddr_in6, AF_INET, AF_INET6,
@@ -260,9 +260,8 @@ fn interface_and_mtu_impl(socket: &UdpSocket) -> Result<(String, usize), Error> 
         {
             // On Linux, we can get the MTU via an ioctl on the socket.
             let mut ifr: ifreq = unsafe { mem::zeroed() };
-            ifr.ifr_name[..iface.len()].copy_from_slice(unsafe {
-                &*(ptr::from_ref::<[u8]>(iface.as_bytes()) as *const [c_char])
-            });
+            ifr.ifr_name[..iface.len()]
+                .copy_from_slice(unsafe { &*ptr::from_ref::<[u8]>(iface.as_bytes()) });
             if unsafe { ioctl(socket.as_raw_fd(), libc::SIOCGIFMTU, &ifr) } != 0 {
                 res = Err(Error::last_os_error());
             } else if let Ok(mtu) = usize::try_from(unsafe { ifr.ifr_ifru.ifru_mtu }) {
