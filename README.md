@@ -1,3 +1,8 @@
+[![Coverage Status](https://codecov.io/gh/mozilla/mtu/branch/main/graph/badge.svg)](https://codecov.io/gh/mozilla/mtu)
+[![Average time to resolve an issue](https://isitmaintained.com/badge/resolution/mozilla/mtu.svg)](https://isitmaintained.com/project/mozilla/mtu "Average time to resolve an issue")
+[![Percentage of issues still open](https://isitmaintained.com/badge/open/mozilla/mtu.svg)](https://isitmaintained.com/project/mozilla/mtu "Percentage of issues still open")
+![Maintenance](https://img.shields.io/badge/maintenance-activly--developed-brightgreen.svg)
+
 # mtu
 
 A crate to return the name and maximum transmission unit (MTU) of the local network interface
