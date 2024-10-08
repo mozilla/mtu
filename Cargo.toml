@@ -15,6 +15,12 @@ license = "MIT OR Apache-2.0"
 # Also keep in sync with .github/workflows/check.yml
 rust-version = "1.76.0"
 
+[badges]
+codecov = { repository = "mozilla/mtu", branch = "main" }
+is-it-maintained-issue-resolution = { repository = "mozilla/mtu", branch = "main" }
+is-it-maintained-open-issues = { repository = "mozilla/mtu", branch = "main" }
+maintenance = { status = "actively-developed", branch = "main" }
+
 [dependencies]
 # Don't increase beyond what Firefox is currently using: https://searchfox.org/mozilla-central/source/Cargo.lock
 libc = { version = "0.2", default-features = false }
