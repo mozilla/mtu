@@ -10,14 +10,16 @@ towards a given destination `SocketAddr`, optionally from a given local `SocketA
 
 ## Usage
 
-This crate exports a single function `interface_and_mtu` that returns the name and [maximum transmission unit (MTU)](https://en.wikipedia.org/wiki/Maximum_transmission_unit) of the outgoing network interface towards a remote destination identified by an `IpAddr`,
+This crate exports a single function `interface_and_mtu` that returns the name and
+[maximum transmission unit (MTU)](https://en.wikipedia.org/wiki/Maximum_transmission_unit)
+of the outgoing network interface towards a remote destination identified by an `IpAddr`.
 
 ## Example
 
 ```rust
-let remote = "127.0.0.1".parse().unwrap();
-let (name, mtu) = mtu::interface_and_mtu(remote).unwrap();
-println!("MTU towards {remote:?} is {mtu} on {name}");
+let destination = "127.0.0.1".parse().unwrap();
+let (name, mtu) = mtu::interface_and_mtu(destination).unwrap();
+println!("MTU towards {destination:?} is {mtu} on {name}");
 ```
 
 ## Supported Platforms
