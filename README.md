@@ -15,11 +15,10 @@ This crate exports a single function `interface_and_mtu` that returns the name a
 of the outgoing network interface towards a remote destination identified by an `IpAddr`.
 
 ## Example
-
 ```rust
-let destination = "127.0.0.1".parse().unwrap();
-let (name, mtu) = mtu::interface_and_mtu(destination).unwrap();
-println!("MTU towards {destination:?} is {mtu} on {name}");
+let destination = IpAddr::V4(Ipv4Addr::LOCALHOST);
+let (name, mtu): (String, usize) = mtu::interface_and_mtu(destination).unwrap();
+println!("MTU towards {destination} is {mtu} on {name}");
 ```
 
 ## Supported Platforms

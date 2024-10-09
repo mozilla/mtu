@@ -33,6 +33,9 @@ windows-targets = "0.52"
 [target."cfg(windows)".dev-dependencies]
 windows-bindgen = { version = "0.58" } # MSRV is 1.70
 
+[build-dependencies]
+cfg_aliases = "0.2"
+
 [lints.clippy]
 cargo = { level = "warn", priority = -1 }
 nursery = { level = "warn", priority = -1 }

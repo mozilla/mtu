@@ -14,11 +14,11 @@
 //! of the outgoing network interface towards a remote destination identified by an `IpAddr`.
 //!
 //! # Example
-//!
-//! ```rust
-//! let destination = "127.0.0.1".parse().unwrap();
-//! let (name, mtu) = mtu::interface_and_mtu(destination).unwrap();
-//! println!("MTU towards {destination:?} is {mtu} on {name}");
+//! ```
+//! # use std::net::{IpAddr, Ipv4Addr};
+//! let destination = IpAddr::V4(Ipv4Addr::LOCALHOST);
+//! let (name, mtu): (String, usize) = mtu::interface_and_mtu(destination).unwrap();
+//! println!("MTU towards {destination} is {mtu} on {name}");
 //! ```
 //!
 //! # Supported Platforms
@@ -46,26 +46,14 @@ use std::{
     net::IpAddr,
 };
 
-#[cfg(any(
-    target_os = "macos",
-    target_os = "ios",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-))]
+#[cfg(any(apple, bsd))]
 use bsd::interface_and_mtu_impl;
 #[cfg(target_os = "linux")]
 use linux::interface_and_mtu_impl;
 #[cfg(target_os = "windows")]
 use windows::interface_and_mtu_impl;
 
-#[cfg(any(
-    target_os = "macos",
-    target_os = "ios",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-))]
+#[cfg(any(apple, bsd))]
 mod bsd;
 
 #[cfg(target_os = "linux")]
@@ -97,14 +85,6 @@ const fn next_item_aligned_by_four(size: usize) -> usize {
 ///
 /// The returned interface name is obtained from the operating system.
 ///
-/// # Examples
-///
-/// ```
-/// let remote = "127.0.0.1".parse().unwrap();
-/// let (name, mtu) = mtu::interface_and_mtu(remote).unwrap();
-/// println!("MTU towards {remote:?} is {mtu} on {name}");
-/// ```
-///
 /// # Errors
 ///
 /// This function returns an error if the local interface MTU cannot be determined.
@@ -130,7 +110,7 @@ mod test {
         }
     }
 
-    #[cfg(any(target_os = "macos", target_os = "freebsd",))]
+    #[cfg(any(apple, target_os = "freebsd",))]
     const LOOPBACK: NameMtu = NameMtu(Some("lo0"), 16_384);
     #[cfg(target_os = "linux")]
     const LOOPBACK: NameMtu = NameMtu(Some("lo"), 65_536);
