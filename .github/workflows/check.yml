@@ -119,7 +119,7 @@ jobs:
         if: (matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest') && matrix.rust-toolchain == 'nightly'
         env:
           RUST_LOG: trace
-          ASAN_OPTIONS: detect_leaks=1
+          ASAN_OPTIONS: detect_leaks=1:detect_stack_use_after_return=1
         run: |
           if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
             sudo apt-get update
