@@ -127,7 +127,7 @@ jobs:
             SANITIZERS="address thread leak memory"
           elif [ "${{ matrix.os }}" = "macos-latest" ]; then
             brew install llvm
-            ASAN_SYMBOLIZER_PATH=/opt/homebrew/opt/llvm/bin/llvm-symbolizer
+            export ASAN_SYMBOLIZER_PATH=/opt/homebrew/opt/llvm/bin/llvm-symbolizer
             # llvm is keg-only, so we need to add it to the PATH
             # export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
             which llvm-symbolizer || true
@@ -135,8 +135,9 @@ jobs:
             TARGET="aarch64-apple-darwin"
             # no memory and leak sanitizer support yet
             SANITIZERS="address thread"
-            # Suppress leaks from dyld4::RuntimeState on macOS
+            # Suppress leaks on macOS. TODO: Check occasionally if these are still needed.
             echo "leak:dyld4::RuntimeState" > suppressions.txt
+            # echo "leak:_fetchInitializingClassList" >> suppressions.txt
             export LSAN_OPTIONS="suppressions=suppressions.txt"
             fi
           for sanitizer in $SANITIZERS; do
