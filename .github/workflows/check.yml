@@ -126,14 +126,14 @@ jobs:
             TARGET="x86_64-unknown-linux-gnu"
             SANITIZERS="address thread leak memory"
           elif [ "${{ matrix.os }}" = "macos-latest" ]; then
+            TARGET="aarch64-apple-darwin"
             # no memory and leak sanitizer support yet
             SANITIZERS="address thread"
             # Suppress leaks on macOS. TODO: Check occasionally if these are still needed.
             echo "leak:dyld4::RuntimeState" > suppressions.txt
             echo "leak:fetchInitializingClassList" >> suppressions.txt
-            cat suppressions.txt
             export LSAN_OPTIONS="suppressions=suppressions.txt"
-            fi
+          fi
           for sanitizer in $SANITIZERS; do
             echo "Running tests with $sanitizer sanitizer..."
             export RUSTFLAGS="-Z sanitizer=$sanitizer"
