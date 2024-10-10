@@ -131,7 +131,10 @@ jobs:
             TARGET="aarch64-apple-darwin"
             # no memory and leak sanitizer support yet
             SANITIZERS="address thread"
-          fi
+            # Suppress leaks from dyld4::RuntimeState on macOS
+            echo "leak:dyld4::RuntimeState" > suppressions.txt
+            export ASAN_OPTIONS="$ASAN_OPTIONS:suppressions=suppressions.txt"
+            fi
           for sanitizer in $SANITIZERS; do
             echo "Running tests with $sanitizer sanitizer..."
             RUSTFLAGS="-Z sanitizer=$sanitizer" RUSTDOCFLAGS="-Z sanitizer=$sanitizer" cargo +nightly test -Z build-std --target "$TARGET"
