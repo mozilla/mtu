@@ -126,13 +126,17 @@ jobs:
             TARGET="x86_64-unknown-linux-gnu"
             SANITIZERS="address thread leak memory"
           elif [ "${{ matrix.os }}" = "macos-latest" ]; then
+            # llvm-symbolizer (as part of llvm) is installed by default on macOS runners
             TARGET="aarch64-apple-darwin"
             # no memory and leak sanitizer support yet
             SANITIZERS="address thread"
-            # Suppress leaks on macOS. TODO: Check occasionally if these are still needed.
-            echo "leak:dyld4::RuntimeState" > suppressions.txt
-            echo "leak:fetchInitializingClassList" >> suppressions.txt
-            export LSAN_OPTIONS="suppressions=suppressions.txt"
+            # Suppress non-mtu leaks on macOS. TODO: Check occasionally if these are still needed.
+            {
+              echo "leak:dyld4::RuntimeState"
+              echo "leak:fetchInitializingClassList"
+            } > suppressions.txt
+            PWD=$(pwd)
+            export LSAN_OPTIONS="suppressions=$PWD/suppressions.txt"
           fi
           for sanitizer in $SANITIZERS; do
             echo "Running tests with $sanitizer sanitizer..."
