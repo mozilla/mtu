@@ -121,27 +121,21 @@ jobs:
           RUST_LOG: trace
           ASAN_OPTIONS: detect_leaks=1:detect_stack_use_after_return=1
         run: |
-          cargo clean
           if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
             sudo apt-get install -y --no-install-recommends llvm
             TARGET="x86_64-unknown-linux-gnu"
             SANITIZERS="address thread leak memory"
           elif [ "${{ matrix.os }}" = "macos-latest" ]; then
-            # brew install llvm lld
-            # export ASAN_SYMBOLIZER_PATH=/opt/homebrew/opt/llvm/bin/llvm-symbolizer
-            # llvm is keg-only, so we need to add it to the PATH
-            # export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
-            TARGET="aarch64-apple-darwin"
             # no memory and leak sanitizer support yet
             SANITIZERS="address thread"
             # Suppress leaks on macOS. TODO: Check occasionally if these are still needed.
-            # echo "leak:dyld4::RuntimeState" > suppressions.txt
-            # echo "leak:_fetchInitializingClassList" >> suppressions.txt
-            # export LSAN_OPTIONS="suppressions=suppressions.txt"
+            echo "leak:dyld4::RuntimeState" > suppressions.txt
+            echo "leak:fetchInitializingClassList" >> suppressions.txt
+            cat suppressions.txt
+            export LSAN_OPTIONS="suppressions=suppressions.txt"
             fi
           for sanitizer in $SANITIZERS; do
             echo "Running tests with $sanitizer sanitizer..."
-            # export RUSTFLAGS="-Z sanitizer=$sanitizer -Clinker=clang -Clink-arg=-fuse-ld=lld"
             export RUSTFLAGS="-Z sanitizer=$sanitizer"
             export RUSTDOCFLAGS="$RUSTFLAGS"
             cargo +nightly test -Z build-std --target "$TARGET"
