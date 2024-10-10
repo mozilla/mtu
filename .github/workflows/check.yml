@@ -127,7 +127,7 @@ jobs:
             TARGET="x86_64-unknown-linux-gnu"
             SANITIZERS="address thread leak memory"
           elif [ "${{ matrix.os }}" = "macos-latest" ]; then
-            # llvm-symbolizer (as part of llvm) is installed by default on macOS runners
+            brew install llvm
             TARGET="aarch64-apple-darwin"
             # no memory and leak sanitizer support yet
             SANITIZERS="address thread"
