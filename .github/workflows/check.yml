@@ -123,11 +123,11 @@ jobs:
         run: |
           cargo clean
           if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
-            sudo apt-get install -y --no-install-recommends llvm lld
+            sudo apt-get install -y --no-install-recommends llvm
             TARGET="x86_64-unknown-linux-gnu"
             SANITIZERS="address thread leak memory"
           elif [ "${{ matrix.os }}" = "macos-latest" ]; then
-            brew install llvm
+            brew install llvm lld
             export ASAN_SYMBOLIZER_PATH=/opt/homebrew/opt/llvm/bin/llvm-symbolizer
             # llvm is keg-only, so we need to add it to the PATH
             export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
