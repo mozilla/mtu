@@ -123,7 +123,7 @@ jobs:
         run: |
           cargo clean
           if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
-            sudo apt-get install -y --no-install-recommends llvm
+            sudo apt-get install -y --no-install-recommends llvm lld
             TARGET="x86_64-unknown-linux-gnu"
             SANITIZERS="address thread leak memory"
           elif [ "${{ matrix.os }}" = "macos-latest" ]; then
