@@ -129,8 +129,8 @@ jobs:
             # brew install llvm
             # llvm is keg-only, so we need to add it to the PATH
             # export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
-            which llvm-symbolizer
-            which dsymutil
+            which llvm-symbolizer || true
+            which dsymutil || true
             TARGET="aarch64-apple-darwin"
             # no memory and leak sanitizer support yet
             SANITIZERS="address thread"
