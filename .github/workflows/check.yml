@@ -129,6 +129,7 @@ jobs:
             brew install llvm
             # llvm is keg-only, so we need to add it to the PATH
             export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
+            which llvm-symbolizer
             TARGET="aarch64-apple-darwin"
             # no memory and leak sanitizer support yet
             SANITIZERS="address thread"
@@ -138,7 +139,7 @@ jobs:
             fi
           for sanitizer in $SANITIZERS; do
             echo "Running tests with $sanitizer sanitizer..."
-            RUSTFLAGS="-Z sanitizer=$sanitizer" RUSTDOCFLAGS="-Z sanitizer=$sanitizer" cargo +nightly test -Z build-std --target "$TARGET"
+            RUSTFLAGS="-Z sanitizer=$sanitizer -Csplit-debuginfo=packed" RUSTDOCFLAGS="-Z sanitizer=$sanitizer" cargo +nightly test -Z build-std --target "$TARGET"
           done
 
   clippy:
