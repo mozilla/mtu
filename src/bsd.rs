@@ -8,21 +8,22 @@ use std::{
     io::Error,
     mem::{self, size_of},
     net::IpAddr,
+    os::fd::{AsRawFd, FromRawFd, OwnedFd},
     ptr, slice, str,
 };
 
 use libc::{
-    close, getpid, read, rt_msghdr, sockaddr_dl, sockaddr_in, sockaddr_in6, sockaddr_storage,
-    socket, write, AF_INET, AF_INET6, PF_ROUTE, RTAX_IFP, RTAX_MAX, RTA_DST, RTA_IFP, RTM_GET,
-    RTM_VERSION, SOCK_RAW,
+    getpid, read, rt_msghdr, sockaddr_dl, sockaddr_in, sockaddr_in6, sockaddr_storage, socket,
+    write, AF_INET, AF_INET6, PF_ROUTE, RTAX_IFP, RTAX_MAX, RTA_DST, RTA_IFP, RTM_GET, RTM_VERSION,
+    SOCK_RAW,
 };
 
 use crate::{default_err, next_item_aligned_by_four};
 
 pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> {
     // Open route socket.
-    let fd = unsafe { socket(PF_ROUTE, SOCK_RAW, 0) };
-    if fd == -1 {
+    let fd = unsafe { OwnedFd::from_raw_fd(socket(PF_ROUTE, SOCK_RAW, 0)) };
+    if fd.as_raw_fd() == -1 {
         return Err(Error::last_os_error());
     }
 
@@ -54,7 +55,7 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
         .map_err(|_| default_err())?; // Length includes sockaddr
     rtm.rtm_version = RTM_VERSION.try_into().map_err(|_| default_err())?;
     rtm.rtm_type = RTM_GET.try_into().map_err(|_| default_err())?;
-    rtm.rtm_seq = fd; // Abuse file descriptor as sequence number, since it's unique
+    rtm.rtm_seq = fd.as_raw_fd(); // Abuse file descriptor as sequence number, since it's unique
     rtm.rtm_addrs = RTA_DST | RTA_IFP; // Query for destination and obtain interface info
 
     // Copy route message and destination `sockaddr` into message buffer.
@@ -73,11 +74,9 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
     }
 
     // Send route message.
-    let res = unsafe { write(fd, msg.as_ptr().cast(), msg.len()) };
+    let res = unsafe { write(fd.as_raw_fd(), msg.as_ptr().cast(), msg.len()) };
     if res == -1 {
-        let err = Error::last_os_error();
-        unsafe { close(fd) };
-        return Err(err);
+        return Err(Error::last_os_error());
     }
 
     // Read route messages.
@@ -88,24 +87,19 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
          (RTAX_MAX as usize * size_of::<sockaddr_storage>())
     ];
     let rtm = loop {
-        let len = unsafe { read(fd, buf.as_mut_ptr().cast(), buf.len()) };
+        let len = unsafe { read(fd.as_raw_fd(), buf.as_mut_ptr().cast(), buf.len()) };
         if len <= 0 {
-            let err = Error::last_os_error();
-            unsafe { close(fd) };
-            return Err(err);
+            return Err(Error::last_os_error());
         }
         let rtm = unsafe { ptr::read_unaligned(buf.as_ptr().cast::<rt_msghdr>()) };
         if rtm.rtm_type == RTM_GET.try_into().map_err(|_| default_err())?
             && rtm.rtm_pid == unsafe { getpid() }
-            && rtm.rtm_seq == fd
+            && rtm.rtm_seq == fd.as_raw_fd()
         {
             // This is the response we are looking for.
             break rtm;
         }
     };
-
-    // Close the route socket.
-    unsafe { close(fd) };
 
     // Parse the route message for the interface name.
     let mut sa = unsafe { buf.as_ptr().add(size_of::<rt_msghdr>()) };

@@ -9,14 +9,15 @@ use std::{
     io::{Error, ErrorKind},
     mem,
     net::IpAddr,
+    os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, OwnedFd},
     ptr,
 };
 
 use libc::{
-    c_int, c_uchar, c_uint, c_ushort, close, nlmsghdr, read, socket, write, AF_INET, AF_INET6,
-    AF_NETLINK, AF_UNSPEC, ARPHRD_NONE, IFLA_IFNAME, IFLA_MTU, NETLINK_ROUTE, NLM_F_ACK,
-    NLM_F_REQUEST, RTA_DST, RTA_OIF, RTM_GETLINK, RTM_GETROUTE, RTM_NEWLINK, RTM_NEWROUTE,
-    RTN_UNICAST, RT_SCOPE_UNIVERSE, RT_TABLE_MAIN, SOCK_RAW,
+    c_int, c_uchar, c_uint, c_ushort, nlmsghdr, read, socket, write, AF_INET, AF_INET6, AF_NETLINK,
+    AF_UNSPEC, ARPHRD_NONE, IFLA_IFNAME, IFLA_MTU, NETLINK_ROUTE, NLM_F_ACK, NLM_F_REQUEST,
+    RTA_DST, RTA_OIF, RTM_GETLINK, RTM_GETROUTE, RTM_NEWLINK, RTM_NEWROUTE, RTN_UNICAST,
+    RT_SCOPE_UNIVERSE, RT_TABLE_MAIN, SOCK_RAW,
 };
 
 use crate::{default_err, next_item_aligned_by_four};
@@ -83,7 +84,7 @@ fn prepare_nlmsg(
     Ok(nlm)
 }
 
-fn if_index(remote: IpAddr, fd: i32) -> Result<i32, Error> {
+fn if_index(remote: IpAddr, fd: BorrowedFd) -> Result<i32, Error> {
     // Prepare RTM_GETROUTE message.
     let nlmsg_len = mem::size_of::<nlmsghdr>()
         + mem::size_of::<rtmsg>()
@@ -136,16 +137,14 @@ fn if_index(remote: IpAddr, fd: i32) -> Result<i32, Error> {
     };
 
     // Send RTM_GETROUTE message to get the interface index associated with the destination.
-    if unsafe { write(fd, buf.as_ptr().cast(), buf.len()) } < 0 {
-        let err = Error::last_os_error();
-        unsafe { close(fd) };
-        return Err(err);
+    if unsafe { write(fd.as_raw_fd(), buf.as_ptr().cast(), buf.len()) } < 0 {
+        return Err(Error::last_os_error());
     }
 
     // Receive RTM_GETROUTE response.
     loop {
         let mut buf = vec![0u8; NETLINK_BUFFER_SIZE];
-        let len = unsafe { read(fd, buf.as_mut_ptr().cast(), buf.len()) };
+        let len = unsafe { read(fd.as_raw_fd(), buf.as_mut_ptr().cast(), buf.len()) };
         if len < 0 {
             return Err(Error::last_os_error());
         }
@@ -177,7 +176,7 @@ fn if_index(remote: IpAddr, fd: i32) -> Result<i32, Error> {
     }
 }
 
-fn if_name_mtu(if_index: i32, fd: i32) -> Result<(String, usize), Error> {
+fn if_name_mtu(if_index: i32, fd: BorrowedFd) -> Result<(String, usize), Error> {
     // Prepare RTM_GETLINK message to get the interface name and MTU for the interface with the
     // obtained index.
     let nlmsg_len = mem::size_of::<nlmsghdr>() + mem::size_of::<ifinfomsg>();
@@ -204,10 +203,8 @@ fn if_name_mtu(if_index: i32, fd: i32) -> Result<(String, usize), Error> {
     }
 
     // Send RTM_GETLINK message.
-    if unsafe { write(fd, buf.as_ptr().cast(), buf.len()) } < 0 {
-        let err = Error::last_os_error();
-        unsafe { close(fd) };
-        return Err(err);
+    if unsafe { write(fd.as_raw_fd(), buf.as_ptr().cast(), buf.len()) } < 0 {
+        return Err(Error::last_os_error());
     }
 
     // Receive RTM_GETLINK response.
@@ -215,7 +212,7 @@ fn if_name_mtu(if_index: i32, fd: i32) -> Result<(String, usize), Error> {
     let mut mtu = None;
     'recv: loop {
         let mut buf = vec![0u8; NETLINK_BUFFER_SIZE];
-        let len = unsafe { read(fd, buf.as_mut_ptr().cast(), buf.len()) };
+        let len = unsafe { read(fd.as_raw_fd(), buf.as_mut_ptr().cast(), buf.len()) };
         if len < 0 {
             return Err(Error::last_os_error());
         }
@@ -268,13 +265,11 @@ fn if_name_mtu(if_index: i32, fd: i32) -> Result<(String, usize), Error> {
 
 pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> {
     // Create a netlink socket.
-    let fd = unsafe { socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE) };
-    if fd < 0 {
+    let fd = unsafe { OwnedFd::from_raw_fd(socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE)) };
+    if fd.as_raw_fd() < 0 {
         return Err(Error::last_os_error());
     }
 
-    let if_index = if_index(remote, fd)?;
-    let res = if_name_mtu(if_index, fd);
-    unsafe { close(fd) };
-    res
+    let if_index = if_index(remote, fd.as_fd())?;
+    if_name_mtu(if_index, fd.as_fd())
 }
