@@ -135,7 +135,7 @@ fn if_index(remote: IpAddr, fd: i32) -> Result<i32, Error> {
         );
     };
 
-    // Send RTM_GETROUTE message to get the interfce index associated with the destination.
+    // Send RTM_GETROUTE message to get the interface index associated with the destination.
     if unsafe { write(fd, buf.as_ptr().cast(), buf.len()) } < 0 {
         let err = Error::last_os_error();
         unsafe { close(fd) };
