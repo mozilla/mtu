@@ -242,7 +242,7 @@ jobs:
             RUST_LOG=trace cargo test --no-fail-fast
 
       - if: matrix.os == 'openbsd'
-        uses: vmactions/openbsd-vm@b526dc847c977759bb655a756b14341e85a72e84
+        uses: vmactions/openbsd-vm@0cfe06e734a0ea3a546fca7ebf200b984b94d58a
         with:
           usesh: true
           copyback: false
