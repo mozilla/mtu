@@ -36,6 +36,7 @@ struct rt_metrics {
     rmx_rtt: libc::c_ulong,         // estimated round trip time
     rmx_rttvar: libc::c_ulong,      // estimated rtt variance
     rmx_pksent: libc::c_ulong,      // packets sent using this route
+    #[cfg(target_os = "freebsd")]
     rmx_filler: [libc::c_ulong; 4], //empty space available for protocol-specific information
 }
 
