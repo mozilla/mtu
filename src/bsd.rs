@@ -13,11 +13,48 @@ use std::{
     ptr, slice, str,
 };
 
+#[cfg(not(bsd))]
+use libc::rt_msghdr;
 use libc::{
-    getpid, read, rt_msghdr, sockaddr_dl, sockaddr_in, sockaddr_in6, sockaddr_storage, socket,
-    write, AF_INET, AF_INET6, PF_ROUTE, RTAX_IFP, RTAX_MAX, RTA_DST, RTA_IFP, RTM_GET, RTM_VERSION,
-    SOCK_RAW,
+    getpid, read, sockaddr_dl, sockaddr_in, sockaddr_in6, sockaddr_storage, socket, write, AF_INET,
+    AF_INET6, PF_ROUTE, RTAX_IFP, RTAX_MAX, RTA_DST, RTA_IFP, RTM_GET, RTM_VERSION, SOCK_RAW,
 };
+
+// The BSDs are lacking `rt_metrics` in their libc bindings.
+#[cfg(bsd)]
+#[allow(non_camel_case_types, clippy::struct_field_names)]
+#[repr(C)]
+struct rt_metrics {
+    rmx_locks: libc::c_ulong,    // Kernel	must leave these values	alone
+    rmx_mtu: libc::c_ulong,      // MTU for this path
+    rmx_hopcount: libc::c_ulong, // max hops expected
+    rmx_expire: libc::c_ulong,   // lifetime for route, e.g. redirect
+    rmx_recvpipe: libc::c_ulong, // inbound delay-bandwidth product
+    rmx_sendpipe: libc::c_ulong, // outbound delay-bandwidth product
+    rmx_ssthresh: libc::c_ulong, // outbound gateway buffer limit
+    rmx_rtt: libc::c_ulong,      // estimated round trip time
+    rmx_rttvar: libc::c_ulong,   // estimated rtt variance
+    rmx_pksent: libc::c_ulong,   // packets sent using this route
+}
+
+// The BSDs are lacking `rt_msghdr` in their libc bindings.
+#[cfg(bsd)]
+#[allow(non_camel_case_types, clippy::struct_field_names)]
+#[repr(C)]
+struct rt_msghdr {
+    rtm_msglen: libc::c_ushort, // to skip over non-understood messages
+    rtm_version: libc::c_uchar, // future	binary compatibility
+    rtm_type: libc::c_uchar,    // message type
+    rtm_index: libc::c_ushort,  // index for associated ifp
+    rtm_flags: libc::c_int,     // flags,	incl kern & message, e.g. DONE
+    rtm_addrs: libc::c_int,     // bitmask identifying sockaddrs in msg
+    rtm_pid: libc::pid_t,       // identify sender
+    rtm_seq: libc::c_int,       // for sender to identify	action
+    rtm_errno: libc::c_int,     // why failed
+    rtm_use: libc::c_int,       // from rtentry
+    rtm_inits: libc::c_ulong,   // which metrics we are initializing
+    rtm_rmx: rt_metrics,        // metrics themselves
+}
 
 use crate::{default_err, next_item_aligned_by_four, unlikely_err};
 
