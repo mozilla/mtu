@@ -257,6 +257,7 @@ jobs:
         with:
           usesh: true
           copyback: false
+          envs: "CARGO_TERM_COLOR RUST_BACKTRACE"
           prepare: |
             mkdir -p /usr/local/etc/pkg/repos
             sed 's/quarterly/latest/' /etc/pkg/FreeBSD.conf > /usr/local/etc/pkg/repos/FreeBSD.conf
@@ -272,6 +273,7 @@ jobs:
         with:
           usesh: true
           copyback: false
+          envs: "CARGO_TERM_COLOR RUST_BACKTRACE"
           prepare: |
             pkg_add rust
           run: |
@@ -284,10 +286,11 @@ jobs:
         with:
           usesh: true
           copyback: false
+          envs: "CARGO_TERM_COLOR RUST_BACKTRACE"
           prepare: |
             /usr/sbin/pkg_add rust
           run: |
-            ifconfig
+            /sbin/ifconfig
             cargo check --all-targets
             RUST_LOG=trace cargo test --no-fail-fast
 
@@ -296,6 +299,7 @@ jobs:
         with:
           usesh: true
           copyback: false
+          envs: "CARGO_TERM_COLOR RUST_BACKTRACE"
           prepare: |
             pkg install cargo
           run: |
