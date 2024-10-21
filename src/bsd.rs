@@ -18,7 +18,7 @@ use libc::rt_msghdr;
 use libc::{
     getpid, read, sockaddr_dl, sockaddr_in, sockaddr_in6, sockaddr_storage, socket, write, AF_INET,
     AF_INET6, AF_UNSPEC, PF_ROUTE, RTAX_IFA, RTAX_IFP, RTAX_MAX, RTA_DST, RTA_IFP, RTM_GET,
-    RTM_VERSION, SOCK_RAW,
+    RTM_VERSION, RTV_MTU, SOCK_RAW,
 };
 
 // The BSDs are lacking `rt_metrics` in their libc bindings.
@@ -109,6 +109,9 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
         .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?;
     rtm.rtm_seq = fd.as_raw_fd(); // Abuse file descriptor as sequence number, since it's unique
     rtm.rtm_addrs = RTA_DST | RTA_IFP; // Query for destination and obtain interface info
+    rtm.rtm_inits = RTV_MTU
+        .try_into()
+        .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?;
 
     // Copy route message and destination `sockaddr` into message buffer.
     let mut msg: Vec<u8> = vec![0; rtm.rtm_msglen as usize];
