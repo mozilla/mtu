@@ -16,7 +16,7 @@ use std::{
 #[cfg(not(bsd))]
 use libc::rt_msghdr;
 use libc::{
-    getpid, read, sockaddr_dl, sockaddr_in, sockaddr_in6, sockaddr_storage, socket, write, AF_INET,
+    getpid, read, send, sockaddr_dl, sockaddr_in, sockaddr_in6, sockaddr_storage, socket, AF_INET,
     AF_INET6, AF_UNSPEC, PF_ROUTE, RTAX_IFP, RTAX_MAX, RTA_DST, RTA_IFP, RTM_GET, RTM_VERSION,
     SOCK_RAW,
 };
@@ -127,7 +127,7 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
 
     // Send route message.
     eprintln!("before write");
-    let res = unsafe { write(fd.as_raw_fd(), msg.as_ptr().cast(), msg.len()) };
+    let res = unsafe { send(fd.as_raw_fd(), msg.as_ptr().cast(), msg.len(), 0) };
     if res == -1 {
         return Err(Error::last_os_error());
     }
