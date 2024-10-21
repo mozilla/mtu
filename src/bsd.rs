@@ -126,10 +126,12 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
     }
 
     // Send route message.
+    eprintln!("before write");
     let res = unsafe { write(fd.as_raw_fd(), msg.as_ptr().cast(), msg.len()) };
     if res == -1 {
         return Err(Error::last_os_error());
     }
+    eprintln!("write");
 
     // Read route messages.
     let mut buf = vec![
@@ -139,10 +141,12 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
          (RTAX_MAX as usize * size_of::<sockaddr_storage>())
     ];
     let rtm = loop {
+        eprintln!("before read");
         let len = unsafe { read(fd.as_raw_fd(), buf.as_mut_ptr().cast(), buf.len()) };
         if len <= 0 {
             return Err(Error::last_os_error());
         }
+        eprintln!("read");
         let rtm = unsafe { ptr::read_unaligned(buf.as_ptr().cast::<rt_msghdr>()) };
         if rtm.rtm_type
             == RTM_GET
