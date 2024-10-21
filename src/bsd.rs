@@ -8,6 +8,7 @@ use std::{
     io::Error,
     mem::{self, size_of},
     net::IpAddr,
+    num::TryFromIntError,
     os::fd::{AsRawFd, FromRawFd, OwnedFd},
     ptr, slice, str,
 };
@@ -18,14 +19,15 @@ use libc::{
     SOCK_RAW,
 };
 
-use crate::{default_err, next_item_aligned_by_four};
+use crate::{default_err, next_item_aligned_by_four, unlikely_err};
 
 pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> {
     // Open route socket.
-    let fd = unsafe { OwnedFd::from_raw_fd(socket(PF_ROUTE, SOCK_RAW, 0)) };
-    if fd.as_raw_fd() == -1 {
+    let fd = unsafe { socket(PF_ROUTE, SOCK_RAW, 0) };
+    if fd == -1 {
         return Err(Error::last_os_error());
     }
+    let fd = unsafe { OwnedFd::from_raw_fd(fd) };
 
     // Prepare buffer with destination `sockaddr`.
     let mut dst: sockaddr_storage = unsafe { mem::zeroed() };
@@ -34,27 +36,35 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
             let sin = unsafe { &mut *ptr::from_mut(&mut dst).cast::<sockaddr_in>() };
             sin.sin_len = size_of::<sockaddr_in>()
                 .try_into()
-                .map_err(|_| default_err())?;
-            sin.sin_family = AF_INET.try_into().map_err(|_| default_err())?;
+                .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?;
+            sin.sin_family = AF_INET
+                .try_into()
+                .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?;
             sin.sin_addr.s_addr = u32::from_ne_bytes(ip.octets());
         }
         IpAddr::V6(ip) => {
             let sin6 = unsafe { &mut *ptr::from_mut(&mut dst).cast::<sockaddr_in6>() };
             sin6.sin6_len = size_of::<sockaddr_in6>()
                 .try_into()
-                .map_err(|_| default_err())?;
-            sin6.sin6_family = AF_INET6.try_into().map_err(|_| default_err())?;
+                .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?;
+            sin6.sin6_family = AF_INET6
+                .try_into()
+                .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?;
             sin6.sin6_addr.s6_addr = ip.octets();
         }
     };
 
     // Prepare route message structure.
     let mut rtm: rt_msghdr = unsafe { mem::zeroed() };
-    rtm.rtm_msglen = (size_of::<rt_msghdr>() + dst.ss_len as usize)
+    rtm.rtm_msglen = (size_of::<rt_msghdr>() + dst.ss_len as usize) // Length includes sockaddr
         .try_into()
-        .map_err(|_| default_err())?; // Length includes sockaddr
-    rtm.rtm_version = RTM_VERSION.try_into().map_err(|_| default_err())?;
-    rtm.rtm_type = RTM_GET.try_into().map_err(|_| default_err())?;
+        .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?;
+    rtm.rtm_version = RTM_VERSION
+        .try_into()
+        .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?;
+    rtm.rtm_type = RTM_GET
+        .try_into()
+        .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?;
     rtm.rtm_seq = fd.as_raw_fd(); // Abuse file descriptor as sequence number, since it's unique
     rtm.rtm_addrs = RTA_DST | RTA_IFP; // Query for destination and obtain interface info
 
@@ -92,7 +102,10 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
             return Err(Error::last_os_error());
         }
         let rtm = unsafe { ptr::read_unaligned(buf.as_ptr().cast::<rt_msghdr>()) };
-        if rtm.rtm_type == RTM_GET.try_into().map_err(|_| default_err())?
+        if rtm.rtm_type
+            == RTM_GET
+                .try_into()
+                .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?
             && rtm.rtm_pid == unsafe { getpid() }
             && rtm.rtm_seq == fd.as_raw_fd()
         {

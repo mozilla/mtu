@@ -6,9 +6,10 @@
 
 use std::{
     ffi::CStr,
-    io::{Error, ErrorKind},
+    io::Error,
     mem,
     net::IpAddr,
+    num::TryFromIntError,
     os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, OwnedFd},
     ptr,
 };
@@ -20,7 +21,7 @@ use libc::{
     RT_SCOPE_UNIVERSE, RT_TABLE_MAIN, SOCK_RAW,
 };
 
-use crate::{default_err, next_item_aligned_by_four};
+use crate::{default_err, next_item_aligned_by_four, unlikely_err};
 
 const NETLINK_BUFFER_SIZE: usize = 8192; // See netlink(7) man page.
 
@@ -75,11 +76,13 @@ fn prepare_nlmsg(
     nlmsg_seq: u32,
 ) -> Result<nlmsghdr, Error> {
     let mut nlm = unsafe { mem::zeroed::<nlmsghdr>() };
-    nlm.nlmsg_len = nlmsg_len.try_into().map_err(|_| default_err())?;
+    nlm.nlmsg_len = nlmsg_len
+        .try_into()
+        .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?;
     nlm.nlmsg_type = nlmsg_type;
     nlm.nlmsg_flags = (NLM_F_REQUEST | NLM_F_ACK)
         .try_into()
-        .map_err(|_| default_err())?;
+        .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?;
     nlm.nlmsg_seq = nlmsg_seq;
     Ok(nlm)
 }
@@ -95,8 +98,12 @@ fn if_index(remote: IpAddr, fd: BorrowedFd) -> Result<i32, Error> {
 
     let mut rtm = unsafe { mem::zeroed::<rtmsg>() };
     rtm.rtm_family = match remote {
-        IpAddr::V4(_) => AF_INET.try_into().map_err(|_| default_err())?,
-        IpAddr::V6(_) => AF_INET6.try_into().map_err(|_| default_err())?,
+        IpAddr::V4(_) => AF_INET
+            .try_into()
+            .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?,
+        IpAddr::V6(_) => AF_INET6
+            .try_into()
+            .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?,
     };
     rtm.rtm_dst_len = addr_len(&remote);
     rtm.rtm_table = RT_TABLE_MAIN;
@@ -106,7 +113,7 @@ fn if_index(remote: IpAddr, fd: BorrowedFd) -> Result<i32, Error> {
     let mut attr = unsafe { mem::zeroed::<rtattr>() };
     attr.rta_len = (mem::size_of::<rtattr>() + addr_bytes(&remote).len())
         .try_into()
-        .map_err(|_| default_err())?;
+        .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?;
     attr.rta_type = RTA_DST;
 
     let mut buf = vec![0u8; nlmsg_len];
@@ -150,7 +157,11 @@ fn if_index(remote: IpAddr, fd: BorrowedFd) -> Result<i32, Error> {
         }
 
         let mut offset = 0;
-        while offset < len.try_into().map_err(|_| default_err())? {
+        while offset
+            < len
+                .try_into()
+                .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?
+        {
             let hdr = unsafe { ptr::read_unaligned(buf.as_ptr().add(offset).cast::<nlmsghdr>()) };
             if hdr.nlmsg_seq == nlmsg_seq && hdr.nlmsg_type == RTM_NEWROUTE {
                 // This is the response, parse through the attributes to find the interface index.
@@ -184,7 +195,9 @@ fn if_name_mtu(if_index: i32, fd: BorrowedFd) -> Result<(String, usize), Error> 
     let hdr = prepare_nlmsg(RTM_GETLINK, nlmsg_len, nlmsg_seq)?;
 
     let mut ifim: ifinfomsg = unsafe { mem::zeroed() };
-    ifim.ifi_family = AF_UNSPEC.try_into().map_err(|_| default_err())?;
+    ifim.ifi_family = AF_UNSPEC
+        .try_into()
+        .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?;
     ifim.ifi_type = ARPHRD_NONE;
     ifim.ifi_index = if_index;
 
@@ -218,7 +231,11 @@ fn if_name_mtu(if_index: i32, fd: BorrowedFd) -> Result<(String, usize), Error> 
         }
 
         let mut offset = 0;
-        while offset < len.try_into().map_err(|_| default_err())? {
+        while offset
+            < len
+                .try_into()
+                .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?
+        {
             let hdr = unsafe { ptr::read_unaligned(buf.as_ptr().add(offset).cast::<nlmsghdr>()) };
             if hdr.nlmsg_seq == nlmsg_seq && hdr.nlmsg_type == RTM_NEWLINK {
                 let mut attr_ptr = unsafe {
@@ -244,7 +261,7 @@ fn if_name_mtu(if_index: i32, fd: BorrowedFd) -> Result<(String, usize), Error> 
                                 )
                             }
                             .try_into()
-                            .map_err(|_| default_err())?,
+                            .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?,
                         );
                     }
                     if ifname.is_some() && mtu.is_some() {
@@ -258,17 +275,18 @@ fn if_name_mtu(if_index: i32, fd: BorrowedFd) -> Result<(String, usize), Error> 
         }
     }
 
-    let name = ifname.ok_or_else(|| Error::new(ErrorKind::Other, "Interface name not found"))?;
-    let mtu = mtu.ok_or_else(|| Error::new(ErrorKind::Other, "MTU not found"))?;
+    let name = ifname.ok_or_else(default_err)?;
+    let mtu = mtu.ok_or_else(default_err)?;
     Ok((name, mtu))
 }
 
 pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> {
     // Create a netlink socket.
-    let fd = unsafe { OwnedFd::from_raw_fd(socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE)) };
-    if fd.as_raw_fd() < 0 {
+    let fd = unsafe { socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE) };
+    if fd == -1 {
         return Err(Error::last_os_error());
     }
+    let fd = unsafe { OwnedFd::from_raw_fd(fd) };
 
     let if_index = if_index(remote, fd.as_fd())?;
     if_name_mtu(if_index, fd.as_fd())
