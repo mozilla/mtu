@@ -17,14 +17,15 @@ use std::{
 use libc::rt_msghdr;
 use libc::{
     getpid, read, sockaddr_dl, sockaddr_in, sockaddr_in6, sockaddr_storage, socket, write, AF_INET,
-    AF_INET6, AF_UNSPEC, PF_ROUTE, RTAX_IFP, RTAX_MAX, RTA_DST, RTA_IFP, RTM_GET, RTM_VERSION,
-    SOCK_RAW,
+    AF_INET6, AF_UNSPEC, PF_ROUTE, RTAX_IFA, RTAX_IFP, RTAX_MAX, RTA_DST, RTA_IFP, RTM_GET,
+    RTM_VERSION, SOCK_RAW,
 };
 
 // The BSDs are lacking `rt_metrics` in their libc bindings.
 #[cfg(bsd)]
 #[allow(non_camel_case_types, clippy::struct_field_names)]
 #[repr(C)]
+#[derive(Debug)]
 struct rt_metrics {
     rmx_locks: libc::c_ulong,    // Kernel must leave these values alone
     rmx_mtu: libc::c_ulong,      // MTU for this path
@@ -44,6 +45,7 @@ struct rt_metrics {
 #[cfg(bsd)]
 #[allow(non_camel_case_types, clippy::struct_field_names)]
 #[repr(C)]
+#[derive(Debug)]
 struct rt_msghdr {
     rtm_msglen: libc::c_ushort, // to skip over non-understood messages
     rtm_version: libc::c_uchar, // future binary compatibility
@@ -62,14 +64,12 @@ struct rt_msghdr {
 use crate::{default_err, next_item_aligned_by_four, unlikely_err};
 
 pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> {
-    eprintln!("bsd::interface_and_mtu_impl(remote: {remote:?})");
     // Open route socket.
     let fd = unsafe { socket(PF_ROUTE, SOCK_RAW, AF_UNSPEC) };
     if fd == -1 {
         return Err(Error::last_os_error());
     }
     let fd = unsafe { OwnedFd::from_raw_fd(fd) };
-    eprintln!("fd: {fd:?}");
 
     // Prepare buffer with destination `sockaddr`.
     let mut dst: sockaddr_storage = unsafe { mem::zeroed() };
@@ -95,7 +95,6 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
             sin6.sin6_addr.s6_addr = ip.octets();
         }
     };
-    eprintln!("dst");
 
     // Prepare route message structure.
     let mut rtm: rt_msghdr = unsafe { mem::zeroed() };
@@ -127,7 +126,6 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
     }
 
     // Send route message.
-    eprintln!("before write: {msg:?}");
     let res = unsafe { write(fd.as_raw_fd(), msg.as_ptr().cast(), msg.len()) };
     if res == -1 {
         return Err(Error::last_os_error());
@@ -165,20 +163,26 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
     let mut sa = unsafe { buf.as_ptr().add(size_of::<rt_msghdr>()) };
     for i in 0..RTAX_MAX {
         let sdl = unsafe { ptr::read_unaligned(sa.cast::<sockaddr_dl>()) };
+        eprintln!(
+            "i {} af {} len {} nlen {}",
+            i, sdl.sdl_family, sdl.sdl_len, sdl.sdl_nlen
+        );
         // Check if the address is present in the message
         if rtm.rtm_addrs & (1 << i) != 0 {
             // Check if the address is the interface address
-            if i == RTAX_IFP {
+            if (i == RTAX_IFA || i == RTAX_IFP) && sdl.sdl_nlen != 0 {
+                eprintln!("sdl {:?} af {}", sdl.sdl_data, sdl.sdl_family);
                 let name = unsafe {
                     slice::from_raw_parts(sdl.sdl_data.as_ptr().cast(), sdl.sdl_nlen as usize)
                 };
-                eprintln!("name: {name:?}");
                 if let Ok(name) = str::from_utf8(name) {
                     // We have our interface name.
+                    eprintln!("name: {name:?}");
                     return Ok((name.to_string(), rtm.rtm_rmx.rmx_mtu as usize));
                 }
             }
             let incr = next_item_aligned_by_four(sdl.sdl_len.into());
+            eprintln!("incr {} {}", sdl.sdl_len, incr);
             sa = unsafe { sa.add(incr) };
         }
     }
