@@ -257,7 +257,7 @@ jobs:
         with:
           usesh: true
           copyback: false
-          envs: "CARGO_TERM_COLOR RUST_BACKTRACE"
+          envs: "CARGO_TERM_COLOR RUST_BACKTRACE GITHUB_ACTIONS"
           prepare: |
             mkdir -p /usr/local/etc/pkg/repos
             sed 's/quarterly/latest/' /etc/pkg/FreeBSD.conf > /usr/local/etc/pkg/repos/FreeBSD.conf
@@ -273,7 +273,7 @@ jobs:
         with:
           usesh: true
           copyback: false
-          envs: "CARGO_TERM_COLOR RUST_BACKTRACE"
+          envs: "CARGO_TERM_COLOR RUST_BACKTRACE GITHUB_ACTIONS"
           prepare: |
             pkg_add rust
           run: |
@@ -286,7 +286,7 @@ jobs:
         with:
           usesh: true
           copyback: false
-          envs: "CARGO_TERM_COLOR RUST_BACKTRACE"
+          envs: "CARGO_TERM_COLOR RUST_BACKTRACE GITHUB_ACTIONS"
           prepare: |
             /usr/sbin/pkg_add rust
           run: |
@@ -299,7 +299,7 @@ jobs:
         with:
           usesh: true
           copyback: false
-          envs: "CARGO_TERM_COLOR RUST_BACKTRACE"
+          envs: "CARGO_TERM_COLOR RUST_BACKTRACE GITHUB_ACTIONS"
           prepare: |
             pkg install cargo
           run: |

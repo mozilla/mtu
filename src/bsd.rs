@@ -17,7 +17,8 @@ use std::{
 use libc::rt_msghdr;
 use libc::{
     getpid, read, sockaddr_dl, sockaddr_in, sockaddr_in6, sockaddr_storage, socket, write, AF_INET,
-    AF_INET6, PF_ROUTE, RTAX_IFP, RTAX_MAX, RTA_DST, RTA_IFP, RTM_GET, RTM_VERSION, SOCK_RAW,
+    AF_INET6, AF_UNSPEC, PF_ROUTE, RTAX_IFP, RTAX_MAX, RTA_DST, RTA_IFP, RTM_GET, RTM_VERSION,
+    SOCK_RAW,
 };
 
 // The BSDs are lacking `rt_metrics` in their libc bindings.
@@ -60,12 +61,14 @@ struct rt_msghdr {
 use crate::{default_err, next_item_aligned_by_four, unlikely_err};
 
 pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> {
+    eprintln!("bsd::interface_and_mtu_impl(remote: {remote:?})");
     // Open route socket.
-    let fd = unsafe { socket(PF_ROUTE, SOCK_RAW, 0) };
+    let fd = unsafe { socket(PF_ROUTE, SOCK_RAW, AF_UNSPEC) };
     if fd == -1 {
         return Err(Error::last_os_error());
     }
     let fd = unsafe { OwnedFd::from_raw_fd(fd) };
+    eprintln!("fd: {fd:?}");
 
     // Prepare buffer with destination `sockaddr`.
     let mut dst: sockaddr_storage = unsafe { mem::zeroed() };
@@ -91,6 +94,7 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
             sin6.sin6_addr.s6_addr = ip.octets();
         }
     };
+    eprintln!("dst");
 
     // Prepare route message structure.
     let mut rtm: rt_msghdr = unsafe { mem::zeroed() };
