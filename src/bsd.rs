@@ -16,9 +16,9 @@ use std::{
 #[cfg(not(bsd))]
 use libc::rt_msghdr;
 use libc::{
-    getpid, recv, send, sockaddr_dl, sockaddr_in, sockaddr_in6, sockaddr_storage, socket, AF_INET,
-    AF_INET6, AF_UNSPEC, MSG_WAITALL, PF_ROUTE, RTAX_IFP, RTAX_MAX, RTA_DST, RTA_IFP, RTM_GET,
-    RTM_VERSION, SOCK_RAW,
+    getpid, read, sockaddr_dl, sockaddr_in, sockaddr_in6, sockaddr_storage, socket, write, AF_INET,
+    AF_INET6, AF_UNSPEC, PF_ROUTE, RTAX_IFP, RTAX_MAX, RTA_DST, RTA_IFP, RTM_GET, RTM_VERSION,
+    SOCK_RAW,
 };
 
 // The BSDs are lacking `rt_metrics` in their libc bindings.
@@ -26,16 +26,16 @@ use libc::{
 #[allow(non_camel_case_types, clippy::struct_field_names)]
 #[repr(C)]
 struct rt_metrics {
-    rmx_locks: libc::c_ulong,       // Kernel must leave these values alone
-    rmx_mtu: libc::c_ulong,         // MTU for this path
-    rmx_hopcount: libc::c_ulong,    // max hops expected
-    rmx_expire: libc::c_ulong,      // lifetime for route, e.g. redirect
-    rmx_recvpipe: libc::c_ulong,    // inbound delay-bandwidth product
-    rmx_sendpipe: libc::c_ulong,    // outbound delay-bandwidth product
-    rmx_ssthresh: libc::c_ulong,    // outbound gateway buffer limit
-    rmx_rtt: libc::c_ulong,         // estimated round trip time
-    rmx_rttvar: libc::c_ulong,      // estimated rtt variance
-    rmx_pksent: libc::c_ulong,      // packets sent using this route
+    rmx_locks: libc::c_ulong,    // Kernel must leave these values alone
+    rmx_mtu: libc::c_ulong,      // MTU for this path
+    rmx_hopcount: libc::c_ulong, // max hops expected
+    rmx_expire: libc::c_ulong,   // lifetime for route, e.g. redirect
+    rmx_recvpipe: libc::c_ulong, // inbound delay-bandwidth product
+    rmx_sendpipe: libc::c_ulong, // outbound delay-bandwidth product
+    rmx_ssthresh: libc::c_ulong, // outbound gateway buffer limit
+    rmx_rtt: libc::c_ulong,      // estimated round trip time
+    rmx_rttvar: libc::c_ulong,   // estimated rtt variance
+    rmx_pksent: libc::c_ulong,   // packets sent using this route
     #[cfg(target_os = "freebsd")]
     rmx_filler: [libc::c_ulong; 4], //empty space available for protocol-specific information
 }
@@ -127,12 +127,12 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
     }
 
     // Send route message.
-    eprintln!("before send");
-    let res = unsafe { send(fd.as_raw_fd(), msg.as_ptr().cast(), msg.len(), 0) };
+    eprintln!("before write: {msg:?}");
+    let res = unsafe { write(fd.as_raw_fd(), msg.as_ptr().cast(), msg.len()) };
     if res == -1 {
         return Err(Error::last_os_error());
     }
-    eprintln!("send");
+    eprintln!("write");
 
     // Read route messages.
     let mut buf = vec![
@@ -142,19 +142,12 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
          (RTAX_MAX as usize * size_of::<sockaddr_storage>())
     ];
     let rtm = loop {
-        eprintln!("before recv");
-        let len = unsafe {
-            recv(
-                fd.as_raw_fd(),
-                buf.as_mut_ptr().cast(),
-                buf.len(),
-                MSG_WAITALL,
-            )
-        };
+        eprintln!("before read");
+        let len = unsafe { read(fd.as_raw_fd(), buf.as_mut_ptr().cast(), buf.len()) };
         if len <= 0 {
             return Err(Error::last_os_error());
         }
-        eprintln!("recv");
+        eprintln!("read");
         let rtm = unsafe { ptr::read_unaligned(buf.as_ptr().cast::<rt_msghdr>()) };
         if rtm.rtm_type
             == RTM_GET
@@ -179,6 +172,7 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
                 let name = unsafe {
                     slice::from_raw_parts(sdl.sdl_data.as_ptr().cast(), sdl.sdl_nlen as usize)
                 };
+                eprintln!("name: {name:?}");
                 if let Ok(name) = str::from_utf8(name) {
                     // We have our interface name.
                     return Ok((name.to_string(), rtm.rtm_rmx.rmx_mtu as usize));

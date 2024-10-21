@@ -265,7 +265,6 @@ jobs:
             pkg install -y rust
           run: |
             ifconfig
-            env | sort
             cargo check --all-targets
             RUST_LOG=trace cargo test --no-fail-fast
 
@@ -279,7 +278,6 @@ jobs:
             pkg_add rust
           run: |
             ifconfig
-            env | sort
             cargo check --all-targets
             RUST_LOG=trace cargo test --no-fail-fast
 
@@ -293,7 +291,6 @@ jobs:
             /usr/sbin/pkg_add rust
           run: |
             /sbin/ifconfig
-            env | sort
             cargo check --all-targets
             RUST_LOG=trace cargo test --no-fail-fast
 
@@ -307,6 +304,5 @@ jobs:
             pkg install cargo
           run: |
             ifconfig
-            env | sort
             cargo check --all-targets
             RUST_LOG=trace cargo test --no-fail-fast
