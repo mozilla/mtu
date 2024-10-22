@@ -74,13 +74,14 @@ fn unlikely_err(msg: String) -> Error {
     Error::new(ErrorKind::Other, msg)
 }
 
-/// Align `size` to the next multiple of `align`.
+/// Align `size` to the next multiple of `align` (which needs to be a power of two).
 #[cfg(not(target_os = "windows"))]
 const fn aligned_by(size: usize, align: usize) -> usize {
     if size == 0 {
         align
     } else {
-        1 + ((size - 1) | (align - 1))
+        (size + (align - 1)) & (!(align - 1))
+        // 1 + ((size - 1) | (align - 1))
     }
 }
 

@@ -17,8 +17,8 @@ use std::{
 use libc::rt_msghdr;
 use libc::{
     getpid, read, sockaddr_dl, sockaddr_in, sockaddr_in6, sockaddr_storage, socket, write, AF_INET,
-    AF_INET6, AF_UNSPEC, PF_ROUTE, RTAX_IFP, RTAX_MAX, RTA_DST, RTA_IFP, RTM_GET, RTM_VERSION,
-    SOCK_RAW,
+    AF_INET6, AF_UNSPEC, PF_ROUTE, RTAX_IFA, RTAX_IFP, RTAX_MAX, RTA_DST, RTA_IFP, RTM_GET,
+    RTM_VERSION, SOCK_RAW,
 };
 
 #[cfg(not(target_os = "netbsd"))]
@@ -200,14 +200,18 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
     // Parse the route message for the interface name.
     let mut sa = unsafe { buf.as_ptr().add(size_of::<rt_msghdr>()) };
     for i in 0..RTAX_MAX {
+        eprintln!("i: {i}");
         let sdl = unsafe { ptr::read_unaligned(sa.cast::<sockaddr_dl>()) };
         // Check if the address is present in the message
         if rtm.rtm_addrs & (1 << i) != 0 {
+            eprintln!("hit {i} sdl {sdl:?}");
             // Check if the address is the interface address
-            if i == RTAX_IFP {
+            if (i == RTAX_IFP || i == RTAX_IFA) && sdl.sdl_nlen > 0 {
+                eprintln!("sdl_len: {}", sdl.sdl_nlen);
                 let name = unsafe {
                     slice::from_raw_parts(sdl.sdl_data.as_ptr().cast(), sdl.sdl_nlen as usize)
                 };
+                eprintln!("name: {name:?}");
                 if let Ok(name) = str::from_utf8(name) {
                     // We have our interface name.
                     return Ok((name.to_string(), rtm.rtm_rmx.rmx_mtu as usize));
