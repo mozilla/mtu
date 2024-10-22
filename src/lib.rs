@@ -165,7 +165,7 @@ mod test {
         // cloudflare.com
         assert_eq!(
             interface_and_mtu(IpAddr::V6(Ipv6Addr::new(
-                0x26, 0x06, 0x47, 0x00, 0x68, 0x10, 0x84, 0xe5,
+                0x2606, 0x4700, 0, 0, 0, 0, 0x6810, 0x84e5,
             )))
             .unwrap(),
             INET
