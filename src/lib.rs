@@ -74,13 +74,13 @@ fn unlikely_err(msg: String) -> Error {
     Error::new(ErrorKind::Other, msg)
 }
 
-/// Align a size to the next multiple of four.
+/// Align `size` to the next multiple of `align`.
 #[cfg(not(target_os = "windows"))]
-const fn next_item_aligned_by_four(size: usize) -> usize {
+const fn aligned_by(size: usize, align: usize) -> usize {
     if size == 0 {
-        4
+        align
     } else {
-        (size + 3) & !3
+        1 + ((size - 1) | (align - 1))
     }
 }
 

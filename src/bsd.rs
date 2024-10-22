@@ -21,11 +21,17 @@ use libc::{
     SOCK_RAW,
 };
 
+#[cfg(not(target_os = "netbsd"))]
+const ALIGN: usize = 4;
+
+#[cfg(target_os = "netbsd")]
+const ALIGN: usize = 8;
+
 // The BSDs are lacking `rt_metrics` in their libc bindings.
 // And of course they are all slightly different.
 #[cfg(target_os = "freebsd")]
 #[allow(non_camel_case_types, clippy::struct_field_names)]
-#[repr(C)]
+#[repr(C, align(8))]
 struct rt_metrics {
     rmx_locks: libc::c_ulong,       // Kernel must leave these values alone
     rmx_mtu: libc::c_ulong,         // MTU for this path
@@ -44,29 +50,29 @@ struct rt_metrics {
 
 #[cfg(target_os = "netbsd")]
 #[allow(non_camel_case_types, clippy::struct_field_names)]
-#[repr(C)]
+#[repr(C, align(8))]
 struct rt_metrics {
-    rmx_locks: libc::uint64_t,    // Kernel must leave these values alone
-    rmx_mtu: libc::uint64_t,      // MTU for this path
-    rmx_hopcount: libc::uint64_t, // max hops expected
-    rmx_recvpipe: libc::uint64_t, // inbound delay-bandwidth product
-    rmx_sendpipe: libc::uint64_t, // outbound delay-bandwidth product
-    rmx_ssthresh: libc::uint64_t, // outbound gateway buffer limit
-    rmx_rtt: libc::uint64_t,      // estimated round trip time
-    rmx_rttvar: libc::uint64_t,   // estimated rtt variance
-    rmx_expire: libc::time_t,     // lifetime for route, e.g. redirect
-    rmx_pksent: libc::time_t,     // packets sent using this route
+    rmx_locks: u64,           // Kernel must leave these values alone
+    rmx_mtu: u64,             // MTU for this path
+    rmx_hopcount: u64,        // max hops expected
+    rmx_recvpipe: u64,        // inbound delay-bandwidth product
+    rmx_sendpipe: u64,        // outbound delay-bandwidth product
+    rmx_ssthresh: u64,        // outbound gateway buffer limit
+    rmx_rtt: u64,             // estimated round trip time
+    rmx_rttvar: u64,          // estimated rtt variance
+    rmx_expire: libc::time_t, // lifetime for route, e.g. redirect
+    rmx_pksent: libc::time_t, // packets sent using this route
 }
 
 #[cfg(target_os = "openbsd")]
 #[allow(non_camel_case_types, clippy::struct_field_names)]
-#[repr(C)]
+#[repr(C, align(8))]
 struct rt_metrics {
-    rmx_pksent: libc::uint64_t, // packets sent using this route
-    rmx_expire: libc::int64_t,  // lifetime for route, e.g. redirect
-    rmx_locks: libc::c_uint,    // Kernel must leave these values
-    rmx_mtu: libc::c_uint,      // MTU for this path
-    rmx_refcnt: libc::c_uint,   // # references hold
+    rmx_pksent: u64,          // packets sent using this route
+    rmx_expire: i64,          // lifetime for route, e.g. redirect
+    rmx_locks: libc::c_uint,  // Kernel must leave these values
+    rmx_mtu: libc::c_uint,    // MTU for this path
+    rmx_refcnt: libc::c_uint, // # references hold
     // some apps may still need these no longer used metrics
     rmx_hopcount: libc::c_uint, // max hops expected
     rmx_recvpipe: libc::c_uint, // inbound delay-bandwidth product
@@ -80,7 +86,7 @@ struct rt_metrics {
 // The BSDs are lacking `rt_msghdr` in their libc bindings.
 #[cfg(bsd)]
 #[allow(non_camel_case_types, clippy::struct_field_names)]
-#[repr(C)]
+#[repr(C, align(8))]
 struct rt_msghdr {
     rtm_msglen: libc::c_ushort, // to skip over non-understood messages
     rtm_version: libc::c_uchar, // future binary compatibility
@@ -96,7 +102,7 @@ struct rt_msghdr {
     rtm_rmx: rt_metrics,        // metrics themselves
 }
 
-use crate::{default_err, next_item_aligned_by_four, unlikely_err};
+use crate::{aligned_by, default_err, unlikely_err};
 
 pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> {
     // Open route socket.
@@ -207,7 +213,7 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
                     return Ok((name.to_string(), rtm.rtm_rmx.rmx_mtu as usize));
                 }
             }
-            let incr = next_item_aligned_by_four(sdl.sdl_len.into());
+            let incr = aligned_by(sdl.sdl_len.into(), ALIGN);
             sa = unsafe { sa.add(incr) };
         }
     }

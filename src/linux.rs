@@ -21,7 +21,7 @@ use libc::{
     RT_SCOPE_UNIVERSE, RT_TABLE_MAIN, SOCK_RAW,
 };
 
-use crate::{default_err, next_item_aligned_by_four, unlikely_err};
+use crate::{aligned_by, default_err, unlikely_err};
 
 const NETLINK_BUFFER_SIZE: usize = 8192; // See netlink(7) man page.
 
@@ -267,7 +267,7 @@ fn if_name_mtu(if_index: i32, fd: BorrowedFd) -> Result<(String, usize), Error> 
                     if ifname.is_some() && mtu.is_some() {
                         break 'recv;
                     }
-                    let incr = next_item_aligned_by_four(attr.rta_len as usize);
+                    let incr = aligned_by(attr.rta_len as usize, 4);
                     attr_ptr = unsafe { attr_ptr.add(incr) };
                 }
             }
