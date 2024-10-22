@@ -17,15 +17,14 @@ use std::{
 use libc::rt_msghdr;
 use libc::{
     getpid, read, sockaddr_dl, sockaddr_in, sockaddr_in6, sockaddr_storage, socket, write, AF_INET,
-    AF_INET6, AF_UNSPEC, PF_ROUTE, RTAX_IFA, RTAX_IFP, RTAX_MAX, RTA_DST, RTA_IFP, RTM_GET,
-    RTM_VERSION, RTV_MTU, SOCK_RAW,
+    AF_INET6, AF_UNSPEC, PF_ROUTE, RTAX_IFP, RTAX_MAX, RTA_DST, RTA_IFP, RTM_GET, RTM_VERSION,
+    SOCK_RAW,
 };
 
 // The BSDs are lacking `rt_metrics` in their libc bindings.
 #[cfg(bsd)]
 #[allow(non_camel_case_types, clippy::struct_field_names)]
 #[repr(C)]
-#[derive(Debug)]
 struct rt_metrics {
     rmx_locks: libc::c_ulong,    // Kernel must leave these values alone
     rmx_mtu: libc::c_ulong,      // MTU for this path
@@ -45,7 +44,6 @@ struct rt_metrics {
 #[cfg(bsd)]
 #[allow(non_camel_case_types, clippy::struct_field_names)]
 #[repr(C)]
-#[derive(Debug)]
 struct rt_msghdr {
     rtm_msglen: libc::c_ushort, // to skip over non-understood messages
     rtm_version: libc::c_uchar, // future binary compatibility
@@ -109,9 +107,6 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
         .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?;
     rtm.rtm_seq = fd.as_raw_fd(); // Abuse file descriptor as sequence number, since it's unique
     rtm.rtm_addrs = RTA_DST | RTA_IFP; // Query for destination and obtain interface info
-    rtm.rtm_inits = RTV_MTU
-        .try_into()
-        .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?;
 
     // Copy route message and destination `sockaddr` into message buffer.
     let mut msg: Vec<u8> = vec![0; rtm.rtm_msglen as usize];
@@ -133,7 +128,6 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
     if res == -1 {
         return Err(Error::last_os_error());
     }
-    eprintln!("write");
 
     // Read route messages.
     let mut buf = vec![
@@ -143,12 +137,10 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
          (RTAX_MAX as usize * size_of::<sockaddr_storage>())
     ];
     let rtm = loop {
-        eprintln!("before read");
         let len = unsafe { read(fd.as_raw_fd(), buf.as_mut_ptr().cast(), buf.len()) };
         if len <= 0 {
             return Err(Error::last_os_error());
         }
-        eprintln!("read");
         let rtm = unsafe { ptr::read_unaligned(buf.as_ptr().cast::<rt_msghdr>()) };
         if rtm.rtm_type
             == RTM_GET
@@ -166,26 +158,19 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
     let mut sa = unsafe { buf.as_ptr().add(size_of::<rt_msghdr>()) };
     for i in 0..RTAX_MAX {
         let sdl = unsafe { ptr::read_unaligned(sa.cast::<sockaddr_dl>()) };
-        eprintln!(
-            "i {} af {} len {} nlen {}",
-            i, sdl.sdl_family, sdl.sdl_len, sdl.sdl_nlen
-        );
         // Check if the address is present in the message
         if rtm.rtm_addrs & (1 << i) != 0 {
             // Check if the address is the interface address
-            if (i == RTAX_IFA || i == RTAX_IFP) && sdl.sdl_nlen != 0 {
-                eprintln!("sdl {:?} af {}", sdl.sdl_data, sdl.sdl_family);
+            if i == RTAX_IFP {
                 let name = unsafe {
                     slice::from_raw_parts(sdl.sdl_data.as_ptr().cast(), sdl.sdl_nlen as usize)
                 };
                 if let Ok(name) = str::from_utf8(name) {
                     // We have our interface name.
-                    eprintln!("name: {name:?}");
                     return Ok((name.to_string(), rtm.rtm_rmx.rmx_mtu as usize));
                 }
             }
             let incr = next_item_aligned_by_four(sdl.sdl_len.into());
-            eprintln!("incr {} {}", sdl.sdl_len, incr);
             sa = unsafe { sa.add(incr) };
         }
     }
