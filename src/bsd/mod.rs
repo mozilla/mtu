@@ -13,7 +13,7 @@ use std::{
     ptr, slice, str,
 };
 
-#[cfg(not(bsd))]
+#[cfg(apple)]
 use libc::rt_msghdr;
 use libc::{
     getpid, read, sockaddr_dl, sockaddr_in, sockaddr_in6, sockaddr_storage, socket, write, AF_INET,
@@ -21,86 +21,18 @@ use libc::{
     RTM_VERSION, SOCK_RAW,
 };
 
-#[cfg(not(target_os = "netbsd"))]
-const ALIGN: usize = 4;
-
-#[cfg(target_os = "netbsd")]
-const ALIGN: usize = 8;
-
-// The BSDs are lacking `rt_metrics` in their libc bindings.
-// And of course they are all slightly different.
 #[cfg(target_os = "freebsd")]
-#[allow(non_camel_case_types, clippy::struct_field_names)]
-#[repr(C, align(8))]
-struct rt_metrics {
-    rmx_locks: libc::c_ulong,       // Kernel must leave these values alone
-    rmx_mtu: libc::c_ulong,         // MTU for this path
-    rmx_hopcount: libc::c_ulong,    // max hops expected
-    rmx_expire: libc::c_ulong,      // lifetime for route, e.g. redirect
-    rmx_recvpipe: libc::c_ulong,    // inbound delay-bandwidth product
-    rmx_sendpipe: libc::c_ulong,    // outbound delay-bandwidth product
-    rmx_ssthresh: libc::c_ulong,    // outbound gateway buffer limit
-    rmx_rtt: libc::c_ulong,         // estimated round trip time
-    rmx_rttvar: libc::c_ulong,      // estimated rtt variance
-    rmx_pksent: libc::c_ulong,      // packets sent using this route
-    rmx_weight: libc::u_long,       // route weight
-    rmx_nhidx: libc::u_long,        // route nexhop index
-    rmx_filler: [libc::c_ulong; 2], // will be used for T/TCP later
-}
-
+use crate::bsd::freebsd::{rt_msghdr, ALIGN};
 #[cfg(target_os = "netbsd")]
-#[allow(non_camel_case_types, clippy::struct_field_names)]
-#[repr(C, align(8))]
-struct rt_metrics {
-    rmx_locks: u64,           // Kernel must leave these values alone
-    rmx_mtu: u64,             // MTU for this path
-    rmx_hopcount: u64,        // max hops expected
-    rmx_recvpipe: u64,        // inbound delay-bandwidth product
-    rmx_sendpipe: u64,        // outbound delay-bandwidth product
-    rmx_ssthresh: u64,        // outbound gateway buffer limit
-    rmx_rtt: u64,             // estimated round trip time
-    rmx_rttvar: u64,          // estimated rtt variance
-    rmx_expire: libc::time_t, // lifetime for route, e.g. redirect
-    rmx_pksent: libc::time_t, // packets sent using this route
-}
-
+use crate::bsd::netbsd::{rt_msghdr, ALIGN};
 #[cfg(target_os = "openbsd")]
-#[allow(non_camel_case_types, clippy::struct_field_names)]
-#[repr(C, align(8))]
-struct rt_metrics {
-    rmx_pksent: u64,          // packets sent using this route
-    rmx_expire: i64,          // lifetime for route, e.g. redirect
-    rmx_locks: libc::c_uint,  // Kernel must leave these values
-    rmx_mtu: libc::c_uint,    // MTU for this path
-    rmx_refcnt: libc::c_uint, // # references hold
-    // some apps may still need these no longer used metrics
-    rmx_hopcount: libc::c_uint, // max hops expected
-    rmx_recvpipe: libc::c_uint, // inbound delay-bandwidth product
-    rmx_sendpipe: libc::c_uint, // outbound delay-bandwidth product
-    rmx_ssthresh: libc::c_uint, // outbound gateway buffer limit
-    rmx_rtt: libc::c_uint,      // estimated round trip time
-    rmx_rttvar: libc::c_uint,   // estimated rtt variance
-    rmx_pad: libc::c_uint,
-}
+use crate::bsd::openbsd::{rt_msghdr, ALIGN};
 
-// The BSDs are lacking `rt_msghdr` in their libc bindings.
-#[cfg(bsd)]
-#[allow(non_camel_case_types, clippy::struct_field_names)]
-#[repr(C, align(8))]
-struct rt_msghdr {
-    rtm_msglen: libc::c_ushort, // to skip over non-understood messages
-    rtm_version: libc::c_uchar, // future binary compatibility
-    rtm_type: libc::c_uchar,    // message type
-    rtm_index: libc::c_ushort,  // index for associated ifp
-    rtm_flags: libc::c_int,     // flags, incl kern & message, e.g. DONE
-    rtm_addrs: libc::c_int,     // bitmask identifying sockaddrs in msg
-    rtm_pid: libc::pid_t,       // identify sender
-    rtm_seq: libc::c_int,       // for sender to identify action
-    rtm_errno: libc::c_int,     // why failed
-    rtm_use: libc::c_int,       // from rtentry
-    rtm_inits: libc::c_ulong,   // which metrics we are initializing
-    rtm_rmx: rt_metrics,        // metrics themselves
-}
+#[cfg(target_os = "freebsd")]
+mod freebsd;
+
+#[cfg(apple)]
+const ALIGN: usize = 4;
 
 use crate::{aligned_by, default_err, unlikely_err};
 
@@ -177,7 +109,7 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
         0u8;
         size_of::<rt_msghdr>() +
         // There will never be `RTAX_MAX` sockaddrs attached, but it's a safe upper bound.
-         (RTAX_MAX as usize * size_of::<sockaddr_storage>())
+         (RTAX_MAX as usize * size_of::<sockaddr_storage>() * 10)
     ];
     let rtm = loop {
         let len = unsafe { read(fd.as_raw_fd(), buf.as_mut_ptr().cast(), buf.len()) };
@@ -191,6 +123,7 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
                 .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?
             && rtm.rtm_pid == unsafe { getpid() }
             && rtm.rtm_seq == fd.as_raw_fd()
+            && rtm.rtm_rmx.rmx_mtu > 0
         {
             // This is the response we are looking for.
             break rtm;
