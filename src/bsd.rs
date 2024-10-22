@@ -22,22 +22,59 @@ use libc::{
 };
 
 // The BSDs are lacking `rt_metrics` in their libc bindings.
-#[cfg(bsd)]
+// And of course they are all slightly different.
+#[cfg(target_os = "freebsd")]
 #[allow(non_camel_case_types, clippy::struct_field_names)]
 #[repr(C)]
 struct rt_metrics {
-    rmx_locks: libc::c_ulong,    // Kernel must leave these values alone
-    rmx_mtu: libc::c_ulong,      // MTU for this path
-    rmx_hopcount: libc::c_ulong, // max hops expected
-    rmx_expire: libc::c_ulong,   // lifetime for route, e.g. redirect
-    rmx_recvpipe: libc::c_ulong, // inbound delay-bandwidth product
-    rmx_sendpipe: libc::c_ulong, // outbound delay-bandwidth product
-    rmx_ssthresh: libc::c_ulong, // outbound gateway buffer limit
-    rmx_rtt: libc::c_ulong,      // estimated round trip time
-    rmx_rttvar: libc::c_ulong,   // estimated rtt variance
-    rmx_pksent: libc::c_ulong,   // packets sent using this route
-    #[cfg(target_os = "freebsd")]
-    rmx_filler: [libc::c_ulong; 4], //empty space available for protocol-specific information
+    rmx_locks: libc::c_ulong,       // Kernel must leave these values alone
+    rmx_mtu: libc::c_ulong,         // MTU for this path
+    rmx_hopcount: libc::c_ulong,    // max hops expected
+    rmx_expire: libc::c_ulong,      // lifetime for route, e.g. redirect
+    rmx_recvpipe: libc::c_ulong,    // inbound delay-bandwidth product
+    rmx_sendpipe: libc::c_ulong,    // outbound delay-bandwidth product
+    rmx_ssthresh: libc::c_ulong,    // outbound gateway buffer limit
+    rmx_rtt: libc::c_ulong,         // estimated round trip time
+    rmx_rttvar: libc::c_ulong,      // estimated rtt variance
+    rmx_pksent: libc::c_ulong,      // packets sent using this route
+    rmx_weight: libc::u_long,       // route weight
+    rmx_nhidx: libc::u_long,        // route nexhop index
+    rmx_filler: [libc::c_ulong; 2], // will be used for T/TCP later
+}
+
+#[cfg(target_os = "netbsd")]
+#[allow(non_camel_case_types, clippy::struct_field_names)]
+#[repr(C)]
+struct rt_metrics {
+    rmx_locks: libc::uint64_t,    // Kernel must leave these values alone
+    rmx_mtu: libc::uint64_t,      // MTU for this path
+    rmx_hopcount: libc::uint64_t, // max hops expected
+    rmx_recvpipe: libc::uint64_t, // inbound delay-bandwidth product
+    rmx_sendpipe: libc::uint64_t, // outbound delay-bandwidth product
+    rmx_ssthresh: libc::uint64_t, // outbound gateway buffer limit
+    rmx_rtt: libc::uint64_t,      // estimated round trip time
+    rmx_rttvar: libc::uint64_t,   // estimated rtt variance
+    rmx_expire: libc::time_t,     // lifetime for route, e.g. redirect
+    rmx_pksent: libc::time_t,     // packets sent using this route
+}
+
+#[cfg(target_os = "openbsd")]
+#[allow(non_camel_case_types, clippy::struct_field_names)]
+#[repr(C)]
+struct rt_metrics {
+    rmx_pksent: libc::uint64_t, // packets sent using this route
+    rmx_expire: libc::int64_t,  // lifetime for route, e.g. redirect
+    rmx_locks: libc::c_uint,    // Kernel must leave these values
+    rmx_mtu: libc::c_uint,      // MTU for this path
+    rmx_refcnt: libc::c_uint,   // # references hold
+    // some apps may still need these no longer used metrics
+    rmx_hopcount: libc::c_uint, // max hops expected
+    rmx_recvpipe: libc::c_uint, // inbound delay-bandwidth product
+    rmx_sendpipe: libc::c_uint, // outbound delay-bandwidth product
+    rmx_ssthresh: libc::c_uint, // outbound gateway buffer limit
+    rmx_rtt: libc::c_uint,      // estimated round trip time
+    rmx_rttvar: libc::c_uint,   // estimated rtt variance
+    rmx_pad: libc::c_uint,
 }
 
 // The BSDs are lacking `rt_msghdr` in their libc bindings.
