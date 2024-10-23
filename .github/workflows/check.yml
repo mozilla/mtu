@@ -261,10 +261,7 @@ jobs:
             mkdir -p /usr/local/etc/pkg/repos
             sed 's/quarterly/latest/' /etc/pkg/FreeBSD.conf > /usr/local/etc/pkg/repos/FreeBSD.conf
             pkg update
-            pkg install -y rust
-            export PATH="/root/.cargo/bin:$PATH"
-            cargo install cargo-binstall
-            cargo binstall cargo-llvm-cov
+            pkg install -y rust cargo-llvm-cov
           run: |
             ifconfig
             cargo check --all-targets
