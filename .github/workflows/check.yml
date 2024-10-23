@@ -262,6 +262,7 @@ jobs:
             sed 's/quarterly/latest/' /etc/pkg/FreeBSD.conf > /usr/local/etc/pkg/repos/FreeBSD.conf
             pkg update
             pkg install -y rust
+            export PATH="/root/.cargo/bin:$PATH"
             cargo install cargo-quickinstall
             cargo quickinstall cargo-llvm-cov
           run: |
@@ -276,6 +277,7 @@ jobs:
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE GITHUB_ACTIONS"
           prepare: |
             pkg_add rust
+            export PATH="/root/.cargo/bin:$PATH"
             cargo install cargo-quickinstall
             cargo quickinstall cargo-llvm-cov
           run: |
@@ -290,6 +292,7 @@ jobs:
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE GITHUB_ACTIONS"
           prepare: |
             /usr/sbin/pkg_add rust
+            export PATH="/root/.cargo/bin:$PATH"
             cargo install cargo-quickinstall
             cargo quickinstall cargo-llvm-cov
           run: |
@@ -304,6 +307,7 @@ jobs:
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE GITHUB_ACTIONS"
           prepare: |
             pkg install cargo
+            export PATH="/root/.cargo/bin:$PATH"
             cargo install cargo-quickinstall
             cargo quickinstall cargo-llvm-cov
           run: |
