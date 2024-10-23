@@ -275,8 +275,7 @@ jobs:
           prepare: |
             pkg_add rust
             export PATH="/root/.cargo/bin:$PATH"
-            cargo install cargo-binstall
-            cargo binstall cargo-llvm-cov
+            cargo install cargo-llvm-cov
           run: |
             ifconfig
             cargo check --all-targets
@@ -290,8 +289,7 @@ jobs:
           prepare: |
             /usr/sbin/pkg_add rust
             export PATH="/root/.cargo/bin:$PATH"
-            cargo install cargo-binstall
-            cargo binstall cargo-llvm-cov
+            cargo install cargo-llvm-cov
           run: |
             /sbin/ifconfig
             cargo check --all-targets
@@ -305,8 +303,7 @@ jobs:
           prepare: |
             pkg install cargo
             export PATH="/root/.cargo/bin:$PATH"
-            cargo install cargo-binstall
-            cargo binstall cargo-llvm-cov
+            cargo install cargo-llvm-cov
           run: |
             ifconfig
             cargo check --all-targets
