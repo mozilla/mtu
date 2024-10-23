@@ -4,7 +4,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-pub const ALIGN: usize = 4;
+pub const ALIGN: usize = 8;
 
 #[allow(non_camel_case_types, clippy::struct_field_names)]
 #[repr(C)]
@@ -24,7 +24,6 @@ pub struct rt_metrics {
     pub rmx_pad: libc::c_uint,
 }
 
-// The BSDs are lacking `rt_msghdr` in their libc bindings.
 #[allow(non_camel_case_types, clippy::struct_field_names)]
 #[repr(C)]
 pub struct rt_msghdr {

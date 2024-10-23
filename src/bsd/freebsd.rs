@@ -24,7 +24,6 @@ pub struct rt_metrics {
     pub rmx_filler: [libc::c_ulong; 2], // will be used for T/TCP later
 }
 
-// The BSDs are lacking `rt_msghdr` in their libc bindings.
 #[allow(non_camel_case_types, clippy::struct_field_names)]
 #[repr(C)]
 pub struct rt_msghdr {

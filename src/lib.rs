@@ -80,8 +80,7 @@ const fn aligned_by(size: usize, align: usize) -> usize {
     if size == 0 {
         align
     } else {
-        (size + (align - 1)) & (!(align - 1))
-        // 1 + ((size - 1) | (align - 1))
+        1 + ((size - 1) | (align - 1))
     }
 }
 
@@ -150,26 +149,23 @@ mod test {
 
     #[test]
     fn inet_v4() {
-        // cloudflare.com
         assert_eq!(
-            interface_and_mtu(IpAddr::V4(Ipv4Addr::new(104, 16, 132, 229))).unwrap(),
+            interface_and_mtu(IpAddr::V4(Ipv4Addr::new(
+                104, 16, 132, 229 // cloudflare.com
+            )))
+            .unwrap(),
             INET
         );
     }
 
     #[test]
     fn inet_v6() {
-        if env::var("GITHUB_ACTIONS").is_ok() {
+        match interface_and_mtu(IpAddr::V6(Ipv6Addr::new(
+            0x2606, 0x4700, 0, 0, 0, 0, 0x6810, 0x84e5, // cloudflare.com
+        ))) {
+            Ok(res) => assert_eq!(res, INET),
             // The GitHub CI environment does not have IPv6 connectivity.
-            return;
+            Err(_) => assert!(env::var("GITHUB_ACTIONS").is_ok()),
         }
-        // cloudflare.com
-        assert_eq!(
-            interface_and_mtu(IpAddr::V6(Ipv6Addr::new(
-                0x2606, 0x4700, 0, 0, 0, 0, 0x6810, 0x84e5,
-            )))
-            .unwrap(),
-            INET
-        );
     }
 }

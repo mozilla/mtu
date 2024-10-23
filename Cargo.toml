@@ -23,7 +23,7 @@ maintenance = { status = "actively-developed", branch = "main" }
 
 [dependencies]
 # Don't increase beyond what Firefox is currently using: https://searchfox.org/mozilla-central/source/Cargo.lock
-libc = { version = ">=0.2.161", default-features = false, features = ["extra_traits"] }
+libc = { version = ">=0.2.161", default-features = false }
 
 [target."cfg(windows)".dependencies]
 # Don't increase beyond what Firefox is currently using: https://searchfox.org/mozilla-central/source/Cargo.lock

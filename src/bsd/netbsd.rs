@@ -7,7 +7,7 @@
 pub const ALIGN: usize = 8;
 
 #[allow(non_camel_case_types, clippy::struct_field_names)]
-#[repr(C, align(8))]
+#[repr(C)]
 pub struct rt_metrics {
     pub rmx_locks: u64,           // Kernel must leave these values alone
     pub rmx_mtu: u64,             // MTU for this path
@@ -21,9 +21,8 @@ pub struct rt_metrics {
     pub rmx_pksent: libc::time_t, // packets sent using this route
 }
 
-// The BSDs are lacking `rt_msghdr` in their libc bindings.
 #[allow(non_camel_case_types, clippy::struct_field_names)]
-#[repr(C, align(8))]
+#[repr(C)]
 pub struct rt_msghdr {
     pub rtm_msglen: libc::c_ushort, // to skip over non-understood messages
     pub rtm_version: libc::c_uchar, // future binary compatibility
