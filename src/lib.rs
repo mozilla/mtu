@@ -55,6 +55,7 @@ use std::{
 mod win_bindings;
 
 /// Prepare a default error result.
+#[inline]
 fn default_result<T>() -> Result<(String, T), Error> {
     Err(Error::new(
         ErrorKind::NotFound,
@@ -120,7 +121,9 @@ where
 {
     let addrs = SocketAddrs::from(addrs);
     let local = match addrs {
+
         SocketAddrs::Local(local) | SocketAddrs::Both((local, _)) => local,
+
         SocketAddrs::Remote(remote) => {
             if remote.is_ipv4() {
                 IpAddr::V4(Ipv4Addr::UNSPECIFIED)
@@ -404,7 +407,7 @@ mod test {
                 // We found an unused port.
                 Ok(socket) => return socket.local_addr().unwrap(),
                 Err(e) => match e.kind() {
-                    ErrorKind::AddrInUse | ErrorKind::PermissionDenied => {
+                    ErrorKind::AddrInUse | ErrorKind::PermissionDenied | ErrorKind::NotConnected => {
                         // We hit a used or priviledged port, try again.
                         continue;
                     }
@@ -434,7 +437,7 @@ mod test {
     fn inet_v6() -> SocketAddr {
         // cloudflare.com
         socket_with_addr(IpAddr::V6(Ipv6Addr::new(
-            0x26, 0x06, 0x47, 0x00, 0x68, 0x10, 0x84, 0xe5,
+            38, 6, 71, 0, 104, 16, 132, 229,
         )))
     }
 
