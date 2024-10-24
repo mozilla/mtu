@@ -26,8 +26,9 @@
 //! * Linux
 //! * macOS
 //! * Windows
-//!
-//! FreeBSD, NetBSD and OpenBSD support is waiting for [rust/libc#3714](https://github.com/rust-lang/libc/pull/3714).
+//! * FreeBSD
+//! * NetBSD
+//! * OpenBSD
 //!
 //! # Notes
 //!
