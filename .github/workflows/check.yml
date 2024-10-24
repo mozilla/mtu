@@ -246,7 +246,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [freebsd, openbsd, netbsd] # rust on solaris is too old
+        os: [freebsd, openbsd, netbsd, solaris] # rust on solaris is too old
     runs-on: ubuntu-latest
 
     steps:
@@ -262,6 +262,7 @@ jobs:
             pkg install -y curl
           run: |
             sh rustup.sh --default-toolchain stable --component llvm-tools-preview -y
+            . "$HOME/.cargo/env"
             cargo install llvm-cov
             ifconfig
             cargo check --all-targets
@@ -274,14 +275,12 @@ jobs:
           usesh: true
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE GITHUB_ACTIONS"
           prepare: |
-            pkg_add curl
+            pkg_add rust # rustup doesn't support OpenBSD at all
           run: |
-            sh rustup.sh --default-toolchain stable --component llvm-tools-preview -y
-            cargo install llvm-cov
             ifconfig
             cargo check --all-targets
             cargo clippy
-            RUST_LOG=trace cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
+            RUST_LOG=trace cargo test --no-fail-fast
 
       - if: matrix.os == 'netbsd'
         uses: vmactions/netbsd-vm@7c9086fdb4cc1aa814cda6e305390c2b966551a9
@@ -292,6 +291,7 @@ jobs:
             /usr/sbin/pkg_add curl
           run: |
             sh rustup.sh --default-toolchain stable --component llvm-tools-preview -y
+            . "$HOME/.cargo/env"
             cargo install llvm-cov
             /sbin/ifconfig
             cargo check --all-targets
@@ -307,6 +307,7 @@ jobs:
             pkg install curl
           run: |
             sh rustup.sh --default-toolchain stable --component llvm-tools-preview -y
+            . "$HOME/.cargo/env"
             cargo install llvm-cov
             ifconfig
             cargo check --all-targets
