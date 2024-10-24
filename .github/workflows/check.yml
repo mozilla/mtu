@@ -263,7 +263,7 @@ jobs:
           run: |
             sh rustup.sh --default-toolchain stable --component llvm-tools-preview -y
             . "$HOME/.cargo/env"
-            cargo install llvm-cov
+            cargo install cargo-llvm-cov --locked
             ifconfig
             cargo check --all-targets
             cargo clippy
@@ -292,7 +292,7 @@ jobs:
           run: |
             sh rustup.sh --default-toolchain stable --component llvm-tools-preview -y
             . "$HOME/.cargo/env"
-            cargo install llvm-cov
+            cargo install cargo-llvm-cov --locked
             /sbin/ifconfig
             cargo check --all-targets
             cargo clippy
@@ -303,12 +303,12 @@ jobs:
         with:
           usesh: true
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE GITHUB_ACTIONS"
-          prepare: |
-            pkg install curl
+          # prepare: |
+          #   pkg install curl
           run: |
             sh rustup.sh --default-toolchain stable --component llvm-tools-preview -y
             . "$HOME/.cargo/env"
-            cargo install llvm-cov
+            cargo install cargo-llvm-cov --locked
             ifconfig
             cargo check --all-targets
             cargo clippy
