@@ -15,7 +15,7 @@ use std::{
 };
 
 use libc::{
-    c_int, c_uchar, c_uint, c_ushort, nlmsghdr, recv, socket, write, AF_INET, AF_INET6, AF_NETLINK,
+    c_int, c_uchar, c_uint, c_ushort, nlmsghdr, read, socket, write, AF_INET, AF_INET6, AF_NETLINK,
     AF_UNSPEC, ARPHRD_NONE, IFLA_IFNAME, IFLA_MTU, NETLINK_ROUTE, NLM_F_ACK, NLM_F_REQUEST,
     RTA_DST, RTA_OIF, RTM_GETLINK, RTM_GETROUTE, RTM_NEWLINK, RTM_NEWROUTE, RTN_UNICAST,
     RT_SCOPE_UNIVERSE, RT_TABLE_MAIN, SOCK_RAW,
@@ -167,7 +167,7 @@ fn if_index(remote: IpAddr, fd: BorrowedFd) -> Result<i32, Error> {
     // Receive RTM_GETROUTE response.
     loop {
         let mut buf = vec![0u8; NETLINK_BUFFER_SIZE];
-        let len = unsafe { recv(fd.as_raw_fd(), buf.as_mut_ptr().cast(), buf.len(), 0) };
+        let len = unsafe { read(fd.as_raw_fd(), buf.as_mut_ptr().cast(), buf.len()) };
         if len < 0 {
             return Err(Error::last_os_error());
         }
@@ -239,7 +239,7 @@ fn if_name_mtu(if_index: i32, fd: BorrowedFd) -> Result<(String, usize), Error> 
     let mut mtu = None;
     'recv: loop {
         let mut buf = vec![0u8; NETLINK_BUFFER_SIZE];
-        let len = unsafe { recv(fd.as_raw_fd(), buf.as_mut_ptr().cast(), buf.len(), 0) };
+        let len = unsafe { read(fd.as_raw_fd(), buf.as_mut_ptr().cast(), buf.len()) };
         if len < 0 {
             return Err(Error::last_os_error());
         }
@@ -300,6 +300,5 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
     let fd = unsafe { OwnedFd::from_raw_fd(fd) };
 
     let if_index = if_index(remote, fd.as_fd())?;
-    eprintln!("if_index: {}", if_index);
     if_name_mtu(if_index, fd.as_fd())
 }

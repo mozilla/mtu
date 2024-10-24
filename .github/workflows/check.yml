@@ -81,7 +81,7 @@ jobs:
       - uses: ./neqo/.github/actions/rust
         with:
           version: ${{ matrix.rust-toolchain }}
-          components: ${{ matrix.rust-toolchain == 'stable' && 'llvm-tools-preview' || '' }} ${{ matrix.rust-toolchain == 'nightly' && 'rust-src' || '' }}
+          components: ${{ matrix.rust-toolchain == 'stable' && 'llvm-tools' || '' }} ${{ matrix.rust-toolchain == 'nightly' && 'rust-src' || '' }}
           tools: ${{ matrix.rust-toolchain == 'stable' && 'cargo-llvm-cov, ' || '' }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -262,7 +262,7 @@ jobs:
           prepare: |
             pkg install -y curl
           run: |
-            sh rustup.sh --default-toolchain stable --component llvm-tools-preview -y
+            sh rustup.sh --default-toolchain stable --component llvm-tools -y
             . "$HOME/.cargo/env"
             cargo install cargo-llvm-cov --locked
             ifconfig
@@ -291,7 +291,7 @@ jobs:
           prepare: |
             /usr/sbin/pkg_add curl
           run: |
-            sh rustup.sh --default-toolchain stable --component llvm-tools-preview -y
+            sh rustup.sh --default-toolchain nightly --component llvm-tools -y
             . "$HOME/.cargo/env"
             cargo install cargo-llvm-cov --locked
             /sbin/ifconfig
@@ -307,7 +307,7 @@ jobs:
           # prepare: |
           #   pkg install curl
           run: |
-            sh rustup.sh --default-toolchain stable --component llvm-tools-preview -y
+            sh rustup.sh --default-toolchain stable --component llvm-tools -y
             . "$HOME/.cargo/env"
             cargo install cargo-llvm-cov --locked
             ifconfig
