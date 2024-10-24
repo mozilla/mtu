@@ -7,9 +7,15 @@
     dead_code,
     clippy::all
 )]
+
+use core::{
+    mem::{transmute, zeroed},
+    ffi::c_void,
+};
+
 #[inline]
-pub unsafe fn FreeMibTable(memory: *const core::ffi::c_void) {
-    windows_targets::link!("iphlpapi.dll" "system" fn FreeMibTable(memory : *const core::ffi::c_void));
+pub unsafe fn FreeMibTable(memory: *const c_void) {
+    windows_targets::link!("iphlpapi.dll" "system" fn FreeMibTable(memory : *const c_void));
     FreeMibTable(memory)
 }
 #[inline]
@@ -31,7 +37,7 @@ pub unsafe fn if_indextoname(
     interfacename: &mut [u8; 256],
 ) -> windows_core::PSTR {
     windows_targets::link!("iphlpapi.dll" "system" fn if_indextoname(interfaceindex : u32, interfacename : windows_core::PSTR) -> windows_core::PSTR);
-    if_indextoname(interfaceindex, core::mem::transmute(interfacename.as_ptr()))
+    if_indextoname(interfaceindex, transmute(interfacename.as_ptr()))
 }
 #[repr(transparent)]
 #[derive(PartialEq, Eq, Copy, Clone, Default)]
@@ -52,7 +58,7 @@ pub const AF_UNSPEC: ADDRESS_FAMILY = ADDRESS_FAMILY(0u16);
 pub struct BOOLEAN(pub u8);
 impl Default for BOOLEAN {
     fn default() -> Self {
-        unsafe { core::mem::zeroed() }
+        unsafe { zeroed() }
     }
 }
 impl windows_core::TypeKind for BOOLEAN {
@@ -68,7 +74,7 @@ impl windows_core::TypeKind for IN6_ADDR {
 }
 impl Default for IN6_ADDR {
     fn default() -> Self {
-        unsafe { core::mem::zeroed() }
+        unsafe { zeroed() }
     }
 }
 #[repr(C)]
@@ -82,7 +88,7 @@ impl windows_core::TypeKind for IN6_ADDR_0 {
 }
 impl Default for IN6_ADDR_0 {
     fn default() -> Self {
-        unsafe { core::mem::zeroed() }
+        unsafe { zeroed() }
     }
 }
 #[repr(C)]
@@ -95,7 +101,7 @@ impl windows_core::TypeKind for IN_ADDR {
 }
 impl Default for IN_ADDR {
     fn default() -> Self {
-        unsafe { core::mem::zeroed() }
+        unsafe { zeroed() }
     }
 }
 #[repr(C)]
@@ -110,7 +116,7 @@ impl windows_core::TypeKind for IN_ADDR_0 {
 }
 impl Default for IN_ADDR_0 {
     fn default() -> Self {
-        unsafe { core::mem::zeroed() }
+        unsafe { zeroed() }
     }
 }
 #[repr(C)]
@@ -126,7 +132,7 @@ impl windows_core::TypeKind for IN_ADDR_0_0 {
 }
 impl Default for IN_ADDR_0_0 {
     fn default() -> Self {
-        unsafe { core::mem::zeroed() }
+        unsafe { zeroed() }
     }
 }
 #[repr(C)]
@@ -140,7 +146,7 @@ impl windows_core::TypeKind for IN_ADDR_0_1 {
 }
 impl Default for IN_ADDR_0_1 {
     fn default() -> Self {
-        unsafe { core::mem::zeroed() }
+        unsafe { zeroed() }
     }
 }
 #[repr(C)]
@@ -187,7 +193,7 @@ impl windows_core::TypeKind for MIB_IPINTERFACE_ROW {
 }
 impl Default for MIB_IPINTERFACE_ROW {
     fn default() -> Self {
-        unsafe { core::mem::zeroed() }
+        unsafe { zeroed() }
     }
 }
 #[repr(C)]
@@ -201,7 +207,7 @@ impl windows_core::TypeKind for MIB_IPINTERFACE_TABLE {
 }
 impl Default for MIB_IPINTERFACE_TABLE {
     fn default() -> Self {
-        unsafe { core::mem::zeroed() }
+        unsafe { zeroed() }
     }
 }
 #[repr(C)]
@@ -215,7 +221,7 @@ impl windows_core::TypeKind for NET_LUID_LH {
 }
 impl Default for NET_LUID_LH {
     fn default() -> Self {
-        unsafe { core::mem::zeroed() }
+        unsafe { zeroed() }
     }
 }
 #[repr(C)]
@@ -228,7 +234,7 @@ impl windows_core::TypeKind for NET_LUID_LH_0 {
 }
 impl Default for NET_LUID_LH_0 {
     fn default() -> Self {
-        unsafe { core::mem::zeroed() }
+        unsafe { zeroed() }
     }
 }
 #[repr(C)]
@@ -241,7 +247,7 @@ impl windows_core::TypeKind for NL_INTERFACE_OFFLOAD_ROD {
 }
 impl Default for NL_INTERFACE_OFFLOAD_ROD {
     fn default() -> Self {
-        unsafe { core::mem::zeroed() }
+        unsafe { zeroed() }
     }
 }
 #[repr(transparent)]
@@ -281,7 +287,7 @@ impl windows_core::TypeKind for SCOPE_ID {
 }
 impl Default for SCOPE_ID {
     fn default() -> Self {
-        unsafe { core::mem::zeroed() }
+        unsafe { zeroed() }
     }
 }
 #[repr(C)]
@@ -295,7 +301,7 @@ impl windows_core::TypeKind for SCOPE_ID_0 {
 }
 impl Default for SCOPE_ID_0 {
     fn default() -> Self {
-        unsafe { core::mem::zeroed() }
+        unsafe { zeroed() }
     }
 }
 #[repr(C)]
@@ -308,7 +314,7 @@ impl windows_core::TypeKind for SCOPE_ID_0_0 {
 }
 impl Default for SCOPE_ID_0_0 {
     fn default() -> Self {
-        unsafe { core::mem::zeroed() }
+        unsafe { zeroed() }
     }
 }
 #[repr(C)]
@@ -322,7 +328,7 @@ impl windows_core::TypeKind for SOCKADDR {
 }
 impl Default for SOCKADDR {
     fn default() -> Self {
-        unsafe { core::mem::zeroed() }
+        unsafe { zeroed() }
     }
 }
 #[repr(C)]
@@ -338,7 +344,7 @@ impl windows_core::TypeKind for SOCKADDR_IN {
 }
 impl Default for SOCKADDR_IN {
     fn default() -> Self {
-        unsafe { core::mem::zeroed() }
+        unsafe { zeroed() }
     }
 }
 #[repr(C)]
@@ -355,7 +361,7 @@ impl windows_core::TypeKind for SOCKADDR_IN6 {
 }
 impl Default for SOCKADDR_IN6 {
     fn default() -> Self {
-        unsafe { core::mem::zeroed() }
+        unsafe { zeroed() }
     }
 }
 #[repr(C)]
@@ -369,7 +375,7 @@ impl windows_core::TypeKind for SOCKADDR_IN6_0 {
 }
 impl Default for SOCKADDR_IN6_0 {
     fn default() -> Self {
-        unsafe { core::mem::zeroed() }
+        unsafe { zeroed() }
     }
 }
 #[repr(C)]
@@ -384,7 +390,7 @@ impl windows_core::TypeKind for SOCKADDR_INET {
 }
 impl Default for SOCKADDR_INET {
     fn default() -> Self {
-        unsafe { core::mem::zeroed() }
+        unsafe { zeroed() }
     }
 }
 #[repr(transparent)]
