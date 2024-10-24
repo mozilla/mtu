@@ -26,10 +26,15 @@ use crate::{
 mod win_bindings;
 
 pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> {
-    // Convert remote to Windows SOCKADDR_INET format.
+    // Convert remote to Windows SOCKADDR_INET format. The SOCKADDR_INET union contains an IPv4 or
+    // an IPv6 address. We allocate and zero-initialize it here.
+    //
+    // See https://learn.microsoft.com/en-us/windows/win32/api/ws2ipdef/ns-ws2ipdef-sockaddr_inet
+
     let mut dst: SOCKADDR_INET = unsafe { mem::zeroed() };
     match remote {
         IpAddr::V4(ip) => {
+            // Initialize the `SOCKADDR_IN` variant of `SOCKADDR_INET` based on `ip`.
             let sin = unsafe { &mut *ptr::from_mut(&mut dst).cast::<SOCKADDR_IN>() };
             sin.sin_family = AF_INET;
             sin.sin_addr = IN_ADDR {
@@ -39,6 +44,7 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
             }
         }
         IpAddr::V6(ip) => {
+            // Initialize the `SOCKADDR_IN6` variant of `SOCKADDR_INET` based on `ip`.
             let sin6 = unsafe { &mut *ptr::from_mut(&mut dst).cast::<SOCKADDR_IN6>() };
             sin6.sin6_family = AF_INET6;
             sin6.sin6_addr = IN6_ADDR {
@@ -50,6 +56,10 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
     // Get the interface index of the best outbound interface towards `dst`.
     let mut idx = 0;
     let res = unsafe {
+        // We're now casting `&dst` to a `SOCKADDR` pointer. This is OK based on
+        // https://learn.microsoft.com/en-us/windows/win32/winsock/sockaddr-2.
+        // With that, we call `GetBestInterfaceEx` to get the interface index into `idx`.
+        // See https://learn.microsoft.com/en-us/windows/win32/api/iphlpapi/nf-iphlpapi-getbestinterfaceex
         GetBestInterfaceEx(
             ptr::from_ref(&dst).cast::<SOCKADDR>(),
             ptr::from_mut(&mut idx),
