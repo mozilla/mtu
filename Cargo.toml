@@ -23,10 +23,8 @@ maintenance = { status = "actively-developed", branch = "main" }
 
 [dependencies]
 # Don't increase beyond what Firefox is currently using: https://searchfox.org/mozilla-central/source/Cargo.lock
-libc = { version = "0.2", default-features = false }
-
-[dev-dependencies]
-rand = { version = "0.8", default-features = false, features = ["std", "std_rng"] }
+libc = { version = ">=0.2.161", default-features = false }
+static_assertions = { version = "1.1", default-features = false }
 
 [target."cfg(windows)".dependencies]
 # Don't increase beyond what Firefox is currently using: https://searchfox.org/mozilla-central/source/Cargo.lock
@@ -35,6 +33,9 @@ windows-targets = "0.52"
 
 [target."cfg(windows)".dev-dependencies]
 windows-bindgen = { version = "0.58" } # MSRV is 1.70
+
+[build-dependencies]
+cfg_aliases = "0.2"
 
 [lints.clippy]
 cargo = { level = "warn", priority = -1 }
