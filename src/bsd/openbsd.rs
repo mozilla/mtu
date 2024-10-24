@@ -4,14 +4,14 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use libc::RTA_DST;
+pub const RTM_ADDRS: i32 = libc::RTA_DST;
 
-pub const ALIGN: usize = 8;
-
-pub const RTM_ADDRS: i32 = RTA_DST;
+// See https://github.com/openbsd/src/blob/d16b38913788369d27d69c304ba0cf7026e7c3fc/sbin/route/route.c#L146-L148
+pub const ALIGN: usize = std::mem::size_of::<libc::c_long>();
 
 #[allow(non_camel_case_types, clippy::struct_field_names)]
 #[repr(C)]
+// See https://github.com/openbsd/src/blob/d16b38913788369d27d69c304ba0cf7026e7c3fc/sys/net/route.h#L71-L85
 pub struct rt_metrics {
     pub rmx_pksent: u64,          // packets sent using this route
     pub rmx_expire: i64,          // lifetime for route, e.g. redirect
@@ -30,6 +30,7 @@ pub struct rt_metrics {
 
 #[allow(non_camel_case_types, clippy::struct_field_names)]
 #[repr(C)]
+// See https://github.com/openbsd/src/blob/d16b38913788369d27d69c304ba0cf7026e7c3fc/sys/net/route.h#L221-L238
 pub struct rt_msghdr {
     pub rtm_msglen: libc::c_ushort, // to skip over non-understood messages
     pub rtm_version: libc::c_uchar, // future binary compatibility

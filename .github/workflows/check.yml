@@ -251,17 +251,19 @@ jobs:
 
     steps:
       - uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938 # v4.2.0
-
+      - run: curl -o rustup.sh --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs
       - if: matrix.os == 'freebsd'
         uses: vmactions/freebsd-vm@c96341966a3954a757e6ea41692f7c7b32312a0c
         with:
           usesh: true
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE GITHUB_ACTIONS"
           prepare: |
-            mkdir -p /usr/local/etc/pkg/repos
-            sed 's/quarterly/latest/' /etc/pkg/FreeBSD.conf > /usr/local/etc/pkg/repos/FreeBSD.conf
-            pkg update
-            pkg install -y rust-nightly cargo-llvm-cov
+            # mkdir -p /usr/local/etc/pkg/repos
+            # sed 's/quarterly/latest/' /etc/pkg/FreeBSD.conf > /usr/local/etc/pkg/repos/FreeBSD.conf
+            # pkg update
+            # pkg install -y rust-nightly cargo-llvm-cov
+            sh rustup.sh --default-toolchain stable --component llvm-tools-preview -y
+            cargo install llvm-cov
           run: |
             ifconfig
             cargo check --all-targets
@@ -274,9 +276,11 @@ jobs:
           usesh: true
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE GITHUB_ACTIONS"
           prepare: |
-            pkg_add rust
-            export PATH="/root/.cargo/bin:$PATH"
-            cargo install cargo-llvm-cov
+            # pkg_add rust
+            # export PATH="/root/.cargo/bin:$PATH"
+            # cargo install cargo-llvm-cov
+            sh rustup.sh --default-toolchain stable --component llvm-tools-preview -y
+            cargo install llvm-cov
           run: |
             ifconfig
             cargo check --all-targets
@@ -289,9 +293,11 @@ jobs:
           usesh: true
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE GITHUB_ACTIONS"
           prepare: |
-            /usr/sbin/pkg_add rust-bin
-            export PATH="/root/.cargo/bin:$PATH"
-            cargo install cargo-llvm-cov
+            # /usr/sbin/pkg_add rust-bin
+            # export PATH="/root/.cargo/bin:$PATH"
+            # cargo install cargo-llvm-cov
+            sh rustup.sh --default-toolchain stable --component llvm-tools-preview -y
+            cargo install llvm-cov
           run: |
             /sbin/ifconfig
             cargo check --all-targets
@@ -304,9 +310,11 @@ jobs:
           usesh: true
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE GITHUB_ACTIONS"
           prepare: |
-            pkg install cargo
-            export PATH="/root/.cargo/bin:$PATH"
-            cargo install cargo-llvm-cov
+            # pkg install cargo
+            # export PATH="/root/.cargo/bin:$PATH"
+            # cargo install cargo-llvm-cov
+            sh rustup.sh --default-toolchain stable --component llvm-tools-preview -y
+            cargo install llvm-cov
           run: |
             ifconfig
             cargo check --all-targets

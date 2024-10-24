@@ -7,7 +7,7 @@
 use std::{
     ffi::CStr,
     io::Error,
-    mem::{self, size_of},
+    mem::{size_of, zeroed},
     net::IpAddr,
     num::TryFromIntError,
     os::fd::{AsRawFd, FromRawFd, OwnedFd},
@@ -97,7 +97,7 @@ fn get_mtu_for_interface(name: &str) -> Result<usize, Error> {
 }
 
 fn as_sockaddr_storage(ip: IpAddr) -> sockaddr_storage {
-    let mut dst: sockaddr_storage = unsafe { mem::zeroed() };
+    let mut dst: sockaddr_storage = unsafe { zeroed() };
     match ip {
         #[allow(clippy::cast_possible_truncation)] // Guarded by `const_assert!` above.
         IpAddr::V4(ip) => {
@@ -129,7 +129,7 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
     let dst = as_sockaddr_storage(remote);
 
     // Prepare route message structure.
-    let mut query: rt_msghdr = unsafe { mem::zeroed() };
+    let mut query: rt_msghdr = unsafe { zeroed() };
     #[allow(clippy::cast_possible_truncation)]
     // Structs len is <= u8::MAX per `const_assert!`s above; `aligned_by` returns max. 16 for IPv6.
     let rtm_msglen = (size_of::<rt_msghdr>() + aligned_by(dst.ss_len.into(), ALIGN)) as u16; // Length includes sockaddr

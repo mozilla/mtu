@@ -4,14 +4,14 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use libc::{RTA_DST, RTA_IFP};
+pub const RTM_ADDRS: i32 = libc::RTA_DST | libc::RTA_IFP;
 
-pub const ALIGN: usize = 4;
-
-pub const RTM_ADDRS: i32 = RTA_DST | RTA_IFP;
+// See https://github.com/freebsd/freebsd-src/blob/524a425d30fce3d5e47614db796046830b1f6a83/sys/net/route.h#L362-L371
+pub const ALIGN: usize = std::mem::size_of::<libc::c_long>();
 
 #[allow(non_camel_case_types, clippy::struct_field_names)]
 #[repr(C)]
+// See https://github.com/freebsd/freebsd-src/blob/524a425d30fce3d5e47614db796046830b1f6a83/sys/net/route.h#L79-L93
 pub struct rt_metrics {
     pub rmx_locks: libc::c_ulong,    // Kernel must leave these values alone
     pub rmx_mtu: libc::c_ulong,      // MTU for this path
@@ -30,6 +30,7 @@ pub struct rt_metrics {
 
 #[allow(non_camel_case_types, clippy::struct_field_names)]
 #[repr(C)]
+// See https://github.com/freebsd/freebsd-src/blob/524a425d30fce3d5e47614db796046830b1f6a83/sys/net/route.h#L249-L263
 pub struct rt_msghdr {
     pub rtm_msglen: libc::c_ushort, // to skip over non-understood messages
     pub rtm_version: libc::c_uchar, // future binary compatibility

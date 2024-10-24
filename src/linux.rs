@@ -7,7 +7,7 @@
 use std::{
     ffi::CStr,
     io::Error,
-    mem,
+    mem::{size_of, zeroed},
     net::IpAddr,
     num::TryFromIntError,
     os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, OwnedFd},
@@ -97,7 +97,7 @@ fn addr_bytes(remote: &IpAddr) -> Vec<u8> {
 }
 
 const fn prepare_nlmsg(nlmsg_type: c_ushort, nlmsg_len: u32, nlmsg_seq: u32) -> libc::nlmsghdr {
-    let mut nlm = unsafe { mem::zeroed::<nlmsghdr>() };
+    let mut nlm = unsafe { zeroed::<nlmsghdr>() };
     nlm.nlmsg_len = nlmsg_len;
     nlm.nlmsg_type = nlmsg_type;
     nlm.nlmsg_flags = NLM_F_REQUEST_U16 | NLM_F_ACK_U16;
@@ -109,14 +109,14 @@ fn if_index(remote: IpAddr, fd: BorrowedFd) -> Result<i32, Error> {
     // Prepare RTM_GETROUTE message.
     #[allow(clippy::cast_possible_truncation)]
     // Structs lens are <= u8::MAX per `const_assert!`s above; `addr_bytes` is max. 16 for IPv6.
-    let nlmsg_len = (mem::size_of::<nlmsghdr>()
-        + mem::size_of::<rtmsg>()
-        + mem::size_of::<rtattr>()
+    let nlmsg_len = (size_of::<nlmsghdr>()
+        + size_of::<rtmsg>()
+        + size_of::<rtattr>()
         + addr_bytes(&remote).len()) as u32;
     let nlmsg_seq = 1;
     let hdr = prepare_nlmsg(RTM_GETROUTE, nlmsg_len, nlmsg_seq);
 
-    let mut rtm = unsafe { mem::zeroed::<rtmsg>() };
+    let mut rtm = unsafe { zeroed::<rtmsg>() };
     rtm.rtm_family = match remote {
         IpAddr::V4(_) => AF_INET_U8,
         IpAddr::V6(_) => AF_INET6_U8,
@@ -126,10 +126,10 @@ fn if_index(remote: IpAddr, fd: BorrowedFd) -> Result<i32, Error> {
     rtm.rtm_scope = RT_SCOPE_UNIVERSE;
     rtm.rtm_type = RTN_UNICAST;
 
-    let mut attr = unsafe { mem::zeroed::<rtattr>() };
+    let mut attr = unsafe { zeroed::<rtattr>() };
     #[allow(clippy::cast_possible_truncation)]
     // Structs len is <= u8::MAX per `const_assert!` above; `addr_bytes` is max. 16 for IPv6.
-    let rta_len = (mem::size_of::<rtattr>() + addr_bytes(&remote).len()) as u16;
+    let rta_len = (size_of::<rtattr>() + addr_bytes(&remote).len()) as u16;
     attr.rta_len = rta_len;
     attr.rta_type = RTA_DST;
 
@@ -138,24 +138,23 @@ fn if_index(remote: IpAddr, fd: BorrowedFd) -> Result<i32, Error> {
         ptr::copy_nonoverlapping(
             ptr::from_ref(&hdr).cast(),
             buf.as_mut_ptr(),
-            mem::size_of::<nlmsghdr>(),
+            size_of::<nlmsghdr>(),
         );
         ptr::copy_nonoverlapping(
             ptr::from_ref(&rtm).cast(),
-            buf.as_mut_ptr().add(mem::size_of::<nlmsghdr>()),
-            mem::size_of::<rtmsg>(),
+            buf.as_mut_ptr().add(size_of::<nlmsghdr>()),
+            size_of::<rtmsg>(),
         );
         ptr::copy_nonoverlapping(
             ptr::from_ref(&attr).cast(),
             buf.as_mut_ptr()
-                .add(mem::size_of::<nlmsghdr>() + mem::size_of::<rtmsg>()),
-            mem::size_of::<rtattr>(),
+                .add(size_of::<nlmsghdr>() + size_of::<rtmsg>()),
+            size_of::<rtattr>(),
         );
         ptr::copy_nonoverlapping(
             addr_bytes(&remote).as_ptr(),
-            buf.as_mut_ptr().add(
-                mem::size_of::<nlmsghdr>() + mem::size_of::<rtmsg>() + mem::size_of::<rtattr>(),
-            ),
+            buf.as_mut_ptr()
+                .add(size_of::<nlmsghdr>() + size_of::<rtmsg>() + size_of::<rtattr>()),
             addr_bytes(&remote).len(),
         );
     };
@@ -182,7 +181,7 @@ fn if_index(remote: IpAddr, fd: BorrowedFd) -> Result<i32, Error> {
                 // This is the response, parse through the attributes to find the interface index.
                 let mut attr_ptr = unsafe {
                     buf.as_ptr()
-                        .add(offset + mem::size_of::<nlmsghdr>() + mem::size_of::<rtmsg>())
+                        .add(offset + size_of::<nlmsghdr>() + size_of::<rtmsg>())
                 };
                 let attr_end = unsafe { buf.as_ptr().add(offset + hdr.nlmsg_len as usize) };
                 while attr_ptr < attr_end {
@@ -190,7 +189,7 @@ fn if_index(remote: IpAddr, fd: BorrowedFd) -> Result<i32, Error> {
                     if attr.rta_type == RTA_OIF {
                         // We have our interface index.
                         let idx = unsafe {
-                            ptr::read_unaligned(attr_ptr.add(mem::size_of::<rtattr>()).cast())
+                            ptr::read_unaligned(attr_ptr.add(size_of::<rtattr>()).cast())
                         };
                         return Ok(idx);
                     }
@@ -207,11 +206,11 @@ fn if_name_mtu(if_index: i32, fd: BorrowedFd) -> Result<(String, usize), Error> 
     // obtained index.
     #[allow(clippy::cast_possible_truncation)]
     // Structs lens are <= u8::MAX per `const_assert!`s above.
-    let nlmsg_len = (mem::size_of::<nlmsghdr>() + mem::size_of::<ifinfomsg>()) as u32;
+    let nlmsg_len = (size_of::<nlmsghdr>() + size_of::<ifinfomsg>()) as u32;
     let nlmsg_seq = 2;
     let hdr = prepare_nlmsg(RTM_GETLINK, nlmsg_len, nlmsg_seq);
 
-    let mut ifim: ifinfomsg = unsafe { mem::zeroed() };
+    let mut ifim: ifinfomsg = unsafe { zeroed() };
     ifim.ifi_family = AF_UNSPEC_U8;
     ifim.ifi_type = ARPHRD_NONE;
     ifim.ifi_index = if_index;
@@ -221,12 +220,12 @@ fn if_name_mtu(if_index: i32, fd: BorrowedFd) -> Result<(String, usize), Error> 
         ptr::copy_nonoverlapping(
             ptr::from_ref(&hdr).cast(),
             buf.as_mut_ptr(),
-            mem::size_of::<nlmsghdr>(),
+            size_of::<nlmsghdr>(),
         );
         ptr::copy_nonoverlapping(
             ptr::from_ref(&ifim).cast(),
-            buf.as_mut_ptr().add(mem::size_of::<nlmsghdr>()),
-            mem::size_of::<ifinfomsg>(),
+            buf.as_mut_ptr().add(size_of::<nlmsghdr>()),
+            size_of::<ifinfomsg>(),
         );
     }
 
@@ -253,15 +252,14 @@ fn if_name_mtu(if_index: i32, fd: BorrowedFd) -> Result<(String, usize), Error> 
             if hdr.nlmsg_seq == nlmsg_seq && hdr.nlmsg_type == RTM_NEWLINK {
                 let mut attr_ptr = unsafe {
                     buf.as_ptr()
-                        .add(offset + mem::size_of::<nlmsghdr>() + mem::size_of::<ifinfomsg>())
+                        .add(offset + size_of::<nlmsghdr>() + size_of::<ifinfomsg>())
                 };
                 let attr_end = unsafe { buf.as_ptr().add(offset + hdr.nlmsg_len as usize) };
                 while attr_ptr < attr_end {
                     let attr = unsafe { ptr::read_unaligned(attr_ptr.cast::<rtattr>()) };
                     if attr.rta_type == IFLA_IFNAME {
-                        let name = unsafe {
-                            CStr::from_ptr(attr_ptr.add(mem::size_of::<rtattr>()).cast())
-                        };
+                        let name =
+                            unsafe { CStr::from_ptr(attr_ptr.add(size_of::<rtattr>()).cast()) };
                         if let Ok(name) = name.to_str() {
                             // We have our interface name.
                             ifname = Some(name.to_string());
@@ -270,7 +268,7 @@ fn if_name_mtu(if_index: i32, fd: BorrowedFd) -> Result<(String, usize), Error> 
                         mtu = Some(
                             unsafe {
                                 ptr::read_unaligned(
-                                    attr_ptr.add(mem::size_of::<rtattr>()).cast::<c_uint>(),
+                                    attr_ptr.add(size_of::<rtattr>()).cast::<c_uint>(),
                                 )
                             }
                             .try_into()
