@@ -263,10 +263,10 @@ jobs:
             # sed 's/quarterly/latest/' /etc/pkg/FreeBSD.conf > /usr/local/etc/pkg/repos/FreeBSD.conf
             # pkg update
             # pkg install -y rust-nightly cargo-llvm-cov
+          run: |
             ls -l
             sh rustup.sh --default-toolchain stable --component llvm-tools-preview -y
             cargo install llvm-cov
-          run: |
             ifconfig
             cargo check --all-targets
             LLVM_COV=/usr/bin/llvm-cov LLVM_PROFDATA=/usr/bin/llvm-profdata RUST_LOG=trace \
@@ -281,10 +281,10 @@ jobs:
             # pkg_add rust
             # export PATH="/root/.cargo/bin:$PATH"
             # cargo install cargo-llvm-cov
+          run: |
             ls -l
             sh rustup.sh --default-toolchain stable --component llvm-tools-preview -y
             cargo install llvm-cov
-          run: |
             ifconfig
             cargo check --all-targets
             LLVM_COV=/usr/bin/llvm-cov LLVM_PROFDATA=/usr/bin/llvm-profdata RUST_LOG=trace \
@@ -299,10 +299,10 @@ jobs:
             # /usr/sbin/pkg_add rust-bin
             # export PATH="/root/.cargo/bin:$PATH"
             # cargo install cargo-llvm-cov
+          run: |
             ls -l
             sh rustup.sh --default-toolchain stable --component llvm-tools-preview -y
             cargo install llvm-cov
-          run: |
             /sbin/ifconfig
             cargo check --all-targets
             LLVM_COV=/usr/pkg/bin/llvm-cov LLVM_PROFDATA=/usr/pkg/bin/llvm-profdata RUST_LOG=trace \
@@ -317,10 +317,10 @@ jobs:
             # pkg install cargo
             # export PATH="/root/.cargo/bin:$PATH"
             # cargo install cargo-llvm-cov
+          run: |
             ls -l
             sh rustup.sh --default-toolchain stable --component llvm-tools-preview -y
             cargo install llvm-cov
-          run: |
             ifconfig
             cargo check --all-targets
             RUST_LOG=trace cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
