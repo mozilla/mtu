@@ -16,9 +16,9 @@ use std::{
 
 use libc::{
     c_int, c_uchar, c_uint, c_ushort, nlmsghdr, read, socket, write, AF_INET, AF_INET6, AF_NETLINK,
-    AF_UNSPEC, ARPHRD_NONE, IFLA_IFNAME, IFLA_MTU, NETLINK_ROUTE, NLM_F_ACK, NLM_F_REQUEST,
-    RTA_DST, RTA_OIF, RTM_GETLINK, RTM_GETROUTE, RTM_NEWLINK, RTM_NEWROUTE, RTN_UNICAST,
-    RT_SCOPE_UNIVERSE, RT_TABLE_MAIN, SOCK_RAW,
+    AF_UNSPEC, ARPHRD_NONE, IFLA_IFNAME, IFLA_MTU, NETLINK_ROUTE, NLMSG_ERROR, NLM_F_ACK,
+    NLM_F_REQUEST, RTA_DST, RTA_OIF, RTM_GETLINK, RTM_GETROUTE, RTM_NEWLINK, RTM_NEWROUTE,
+    RTN_UNICAST, RT_SCOPE_UNIVERSE, RT_TABLE_MAIN, SOCK_RAW,
 };
 use static_assertions::{const_assert, const_assert_eq};
 
@@ -43,6 +43,10 @@ const_assert_eq!(NLM_F_REQUEST_U16 as c_int, NLM_F_REQUEST);
 #[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
 const NLM_F_ACK_U16: u16 = NLM_F_ACK as u16;
 const_assert_eq!(NLM_F_ACK_U16 as c_int, NLM_F_ACK);
+
+#[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
+const NLMSG_ERROR_U16: u16 = NLMSG_ERROR as u16;
+const_assert_eq!(NLMSG_ERROR_U16 as c_int, NLMSG_ERROR);
 
 const_assert!(size_of::<nlmsghdr>() <= u8::MAX as usize);
 const_assert!(size_of::<rtmsg>() <= u8::MAX as usize);
@@ -113,7 +117,9 @@ fn if_index(remote: IpAddr, fd: BorrowedFd) -> Result<i32, Error> {
         + size_of::<rtmsg>()
         + size_of::<rtattr>()
         + addr_bytes(&remote).len()) as u32;
-    let nlmsg_seq = 1;
+    #[allow(clippy::cast_sign_loss)]
+    // OK, because they are the same length and we just care about a unique value here.
+    let nlmsg_seq = fd.as_raw_fd() as u32;
     let hdr = prepare_nlmsg(RTM_GETROUTE, nlmsg_len, nlmsg_seq);
 
     let mut rtm = unsafe { zeroed::<rtmsg>() };
@@ -177,23 +183,38 @@ fn if_index(remote: IpAddr, fd: BorrowedFd) -> Result<i32, Error> {
         let mut offset = 0;
         while offset < len {
             let hdr = unsafe { ptr::read_unaligned(buf.as_ptr().add(offset).cast::<nlmsghdr>()) };
-            if hdr.nlmsg_seq == nlmsg_seq && hdr.nlmsg_type == RTM_NEWROUTE {
-                // This is the response, parse through the attributes to find the interface index.
-                let mut attr_ptr = unsafe {
-                    buf.as_ptr()
-                        .add(offset + size_of::<nlmsghdr>() + size_of::<rtmsg>())
-                };
-                let attr_end = unsafe { buf.as_ptr().add(offset + hdr.nlmsg_len as usize) };
-                while attr_ptr < attr_end {
-                    let attr = unsafe { ptr::read_unaligned(attr_ptr.cast::<rtattr>()) };
-                    if attr.rta_type == RTA_OIF {
-                        // We have our interface index.
-                        let idx = unsafe {
-                            ptr::read_unaligned(attr_ptr.add(size_of::<rtattr>()).cast())
+            if hdr.nlmsg_seq == nlmsg_seq {
+                match hdr.nlmsg_type {
+                    NLMSG_ERROR_U16 => {
+                        // Extract the error code and return it.
+                        let err: c_int = unsafe {
+                            ptr::read_unaligned(
+                                buf.as_ptr().add(offset + size_of::<nlmsghdr>()).cast(),
+                            )
                         };
-                        return Ok(idx);
+                        return Err(Error::from_raw_os_error(-err));
                     }
-                    attr_ptr = unsafe { attr_ptr.add(attr.rta_len as usize) };
+                    RTM_NEWROUTE => {
+                        // This is the response, parse through the attributes to find the interface
+                        // index.
+                        let mut attr_ptr = unsafe {
+                            buf.as_ptr()
+                                .add(offset + size_of::<nlmsghdr>() + size_of::<rtmsg>())
+                        };
+                        let attr_end = unsafe { buf.as_ptr().add(offset + hdr.nlmsg_len as usize) };
+                        while attr_ptr < attr_end {
+                            let attr = unsafe { ptr::read_unaligned(attr_ptr.cast::<rtattr>()) };
+                            if attr.rta_type == RTA_OIF {
+                                // We have our interface index.
+                                let idx = unsafe {
+                                    ptr::read_unaligned(attr_ptr.add(size_of::<rtattr>()).cast())
+                                };
+                                return Ok(idx);
+                            }
+                            attr_ptr = unsafe { attr_ptr.add(attr.rta_len as usize) };
+                        }
+                    }
+                    _ => (),
                 }
             }
             offset += hdr.nlmsg_len as usize;
@@ -249,37 +270,52 @@ fn if_name_mtu(if_index: i32, fd: BorrowedFd) -> Result<(String, usize), Error> 
         let mut offset = 0;
         while offset < len {
             let hdr = unsafe { ptr::read_unaligned(buf.as_ptr().add(offset).cast::<nlmsghdr>()) };
-            if hdr.nlmsg_seq == nlmsg_seq && hdr.nlmsg_type == RTM_NEWLINK {
-                let mut attr_ptr = unsafe {
-                    buf.as_ptr()
-                        .add(offset + size_of::<nlmsghdr>() + size_of::<ifinfomsg>())
-                };
-                let attr_end = unsafe { buf.as_ptr().add(offset + hdr.nlmsg_len as usize) };
-                while attr_ptr < attr_end {
-                    let attr = unsafe { ptr::read_unaligned(attr_ptr.cast::<rtattr>()) };
-                    if attr.rta_type == IFLA_IFNAME {
-                        let name =
-                            unsafe { CStr::from_ptr(attr_ptr.add(size_of::<rtattr>()).cast()) };
-                        if let Ok(name) = name.to_str() {
-                            // We have our interface name.
-                            ifname = Some(name.to_string());
-                        }
-                    } else if attr.rta_type == IFLA_MTU {
-                        mtu = Some(
-                            unsafe {
-                                ptr::read_unaligned(
-                                    attr_ptr.add(size_of::<rtattr>()).cast::<c_uint>(),
-                                )
+            if hdr.nlmsg_seq == nlmsg_seq {
+                match hdr.nlmsg_type {
+                    NLMSG_ERROR_U16 => {
+                        // Extract the error code and return it.
+                        let err: c_int = unsafe {
+                            ptr::read_unaligned(
+                                buf.as_ptr().add(offset + size_of::<nlmsghdr>()).cast(),
+                            )
+                        };
+                        return Err(Error::from_raw_os_error(-err));
+                    }
+                    RTM_NEWLINK => {
+                        let mut attr_ptr = unsafe {
+                            buf.as_ptr()
+                                .add(offset + size_of::<nlmsghdr>() + size_of::<ifinfomsg>())
+                        };
+                        let attr_end = unsafe { buf.as_ptr().add(offset + hdr.nlmsg_len as usize) };
+                        while attr_ptr < attr_end {
+                            let attr = unsafe { ptr::read_unaligned(attr_ptr.cast::<rtattr>()) };
+                            if attr.rta_type == IFLA_IFNAME {
+                                let name = unsafe {
+                                    CStr::from_ptr(attr_ptr.add(size_of::<rtattr>()).cast())
+                                };
+                                if let Ok(name) = name.to_str() {
+                                    // We have our interface name.
+                                    ifname = Some(name.to_string());
+                                }
+                            } else if attr.rta_type == IFLA_MTU {
+                                mtu = Some(
+                                    unsafe {
+                                        ptr::read_unaligned(
+                                            attr_ptr.add(size_of::<rtattr>()).cast::<c_uint>(),
+                                        )
+                                    }
+                                    .try_into()
+                                    .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?,
+                                );
                             }
-                            .try_into()
-                            .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?,
-                        );
+                            if ifname.is_some() && mtu.is_some() {
+                                break 'recv;
+                            }
+                            let incr = aligned_by(attr.rta_len as usize, 4);
+                            attr_ptr = unsafe { attr_ptr.add(incr) };
+                        }
                     }
-                    if ifname.is_some() && mtu.is_some() {
-                        break 'recv;
-                    }
-                    let incr = aligned_by(attr.rta_len as usize, 4);
-                    attr_ptr = unsafe { attr_ptr.add(incr) };
+                    _ => (),
                 }
             }
             offset += hdr.nlmsg_len as usize;
