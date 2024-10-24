@@ -291,7 +291,7 @@ jobs:
           prepare: |
             /usr/sbin/pkg_add curl
           run: |
-            sh rustup.sh --default-toolchain nightly --component llvm-tools -y
+            sh rustup.sh --default-toolchain stable --component llvm-tools -y
             . "$HOME/.cargo/env"
             cargo install cargo-llvm-cov --locked
             /sbin/ifconfig
