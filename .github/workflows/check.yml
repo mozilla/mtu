@@ -265,7 +265,8 @@ jobs:
           run: |
             ifconfig
             cargo check --all-targets
-            RUST_LOG=trace cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
+            LLVM_COV=/usr/bin/llvm-cov LLVM_PROFDATA=/usr/bin/llvm-profdata RUST_LOG=trace \
+              cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
 
       - if: matrix.os == 'openbsd'
         uses: vmactions/openbsd-vm@b526dc847c977759bb655a756b14341e85a72e84
@@ -279,7 +280,8 @@ jobs:
           run: |
             ifconfig
             cargo check --all-targets
-            RUST_LOG=trace cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
+            LLVM_COV=/usr/bin/llvm-cov LLVM_PROFDATA=/usr/bin/llvm-profdata RUST_LOG=trace \
+              RUST_LOG=trace cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
 
       - if: matrix.os == 'netbsd'
         uses: vmactions/netbsd-vm@7c9086fdb4cc1aa814cda6e305390c2b966551a9
@@ -293,7 +295,8 @@ jobs:
           run: |
             /sbin/ifconfig
             cargo check --all-targets
-            RUST_LOG=trace cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
+            LLVM_COV=/usr/pkg/bin/llvm-cov LLVM_PROFDATA=/usr/pkg/bin/llvm-profdata RUST_LOG=trace \
+              RUST_LOG=trace cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
 
       - if: matrix.os == 'solaris'
         uses: vmactions/solaris-vm@a89b9438868c70db27e41625f0a5de6ff5e90809
