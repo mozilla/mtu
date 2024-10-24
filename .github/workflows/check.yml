@@ -259,18 +259,14 @@ jobs:
           usesh: true
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE GITHUB_ACTIONS"
           prepare: |
-            # mkdir -p /usr/local/etc/pkg/repos
-            # sed 's/quarterly/latest/' /etc/pkg/FreeBSD.conf > /usr/local/etc/pkg/repos/FreeBSD.conf
-            # pkg update
-            # pkg install -y rust-nightly cargo-llvm-cov
+            pkg install -y curl
           run: |
-            ls -l
             sh rustup.sh --default-toolchain stable --component llvm-tools-preview -y
             cargo install llvm-cov
             ifconfig
             cargo check --all-targets
-            LLVM_COV=/usr/bin/llvm-cov LLVM_PROFDATA=/usr/bin/llvm-profdata RUST_LOG=trace \
-              cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
+            cargo clippy
+            RUST_LOG=trace cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
 
       - if: matrix.os == 'openbsd'
         uses: vmactions/openbsd-vm@0cfe06e734a0ea3a546fca7ebf200b984b94d58a
@@ -278,17 +274,14 @@ jobs:
           usesh: true
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE GITHUB_ACTIONS"
           prepare: |
-            # pkg_add rust
-            # export PATH="/root/.cargo/bin:$PATH"
-            # cargo install cargo-llvm-cov
+            pkg_add curl
           run: |
-            ls -l
             sh rustup.sh --default-toolchain stable --component llvm-tools-preview -y
             cargo install llvm-cov
             ifconfig
             cargo check --all-targets
-            LLVM_COV=/usr/bin/llvm-cov LLVM_PROFDATA=/usr/bin/llvm-profdata RUST_LOG=trace \
-              RUST_LOG=trace cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
+            cargo clippy
+            RUST_LOG=trace cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
 
       - if: matrix.os == 'netbsd'
         uses: vmactions/netbsd-vm@7c9086fdb4cc1aa814cda6e305390c2b966551a9
@@ -296,17 +289,14 @@ jobs:
           usesh: true
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE GITHUB_ACTIONS"
           prepare: |
-            # /usr/sbin/pkg_add rust-bin
-            # export PATH="/root/.cargo/bin:$PATH"
-            # cargo install cargo-llvm-cov
+            /usr/sbin/pkg_add curl
           run: |
-            ls -l
             sh rustup.sh --default-toolchain stable --component llvm-tools-preview -y
             cargo install llvm-cov
             /sbin/ifconfig
             cargo check --all-targets
-            LLVM_COV=/usr/pkg/bin/llvm-cov LLVM_PROFDATA=/usr/pkg/bin/llvm-profdata RUST_LOG=trace \
-              RUST_LOG=trace cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
+            cargo clippy
+            llvm-profdata RUST_LOG=trace cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
 
       - if: matrix.os == 'solaris'
         uses: vmactions/solaris-vm@a89b9438868c70db27e41625f0a5de6ff5e90809
@@ -314,15 +304,13 @@ jobs:
           usesh: true
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE GITHUB_ACTIONS"
           prepare: |
-            # pkg install cargo
-            # export PATH="/root/.cargo/bin:$PATH"
-            # cargo install cargo-llvm-cov
+            pkg install curl
           run: |
-            ls -l
             sh rustup.sh --default-toolchain stable --component llvm-tools-preview -y
             cargo install llvm-cov
             ifconfig
             cargo check --all-targets
+            cargo clippy
             RUST_LOG=trace cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
 
       - uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238 # v4.6.0
