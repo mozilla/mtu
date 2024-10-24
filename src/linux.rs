@@ -57,6 +57,7 @@ const NETLINK_BUFFER_SIZE: usize = 8192; // See netlink(7) man page.
 
 #[allow(non_camel_case_types, clippy::struct_field_names)]
 #[repr(C)]
+// See https://github.com/torvalds/linux/blob/98f7e32f20d28ec452afb208f9cffc08448a2652/include/uapi/linux/rtnetlink.h#L561-L568
 struct ifinfomsg {
     ifi_family: c_uchar, // AF_UNSPEC
     ifi_type: c_ushort,  // Device type
@@ -67,6 +68,7 @@ struct ifinfomsg {
 
 #[allow(non_camel_case_types, clippy::struct_field_names)]
 #[repr(C)]
+// See https://github.com/torvalds/linux/blob/98f7e32f20d28ec452afb208f9cffc08448a2652/include/uapi/linux/rtnetlink.h#L237-L249
 struct rtmsg {
     rtm_family: c_uchar,   // Address family of route
     rtm_dst_len: c_uchar,  // Length of destination
@@ -81,6 +83,7 @@ struct rtmsg {
 
 #[allow(non_camel_case_types)]
 #[repr(C)]
+// See https://github.com/torvalds/linux/blob/98f7e32f20d28ec452afb208f9cffc08448a2652/include/uapi/linux/rtnetlink.h#L211-L214
 struct rtattr {
     rta_len: c_ushort,  // Length of option
     rta_type: c_ushort, // Type of option
@@ -311,6 +314,7 @@ fn if_name_mtu(if_index: i32, fd: BorrowedFd) -> Result<(String, usize), Error> 
                             if ifname.is_some() && mtu.is_some() {
                                 break 'recv;
                             }
+                            // See https://github.com/torvalds/linux/blob/98f7e32f20d28ec452afb208f9cffc08448a2652/include/uapi/linux/rtnetlink.h#L218
                             let incr = aligned_by(attr.rta_len as usize, 4);
                             attr_ptr = unsafe { attr_ptr.add(incr) };
                         }
