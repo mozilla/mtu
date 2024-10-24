@@ -4,7 +4,11 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use libc::RTA_DST;
+
 pub const ALIGN: usize = 8;
+
+pub const RTM_ADDRS: i32 = RTA_DST;
 
 #[allow(non_camel_case_types, clippy::struct_field_names)]
 #[repr(C)]

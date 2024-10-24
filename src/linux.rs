@@ -20,8 +20,34 @@ use libc::{
     RTA_DST, RTA_OIF, RTM_GETLINK, RTM_GETROUTE, RTM_NEWLINK, RTM_NEWROUTE, RTN_UNICAST,
     RT_SCOPE_UNIVERSE, RT_TABLE_MAIN, SOCK_RAW,
 };
+use static_assertions::{const_assert, const_assert_eq};
 
 use crate::{aligned_by, default_err, unlikely_err};
+
+#[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
+const AF_INET_U8: u8 = AF_INET as u8;
+const_assert_eq!(AF_INET_U8 as i32, AF_INET);
+
+#[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
+const AF_INET6_U8: u8 = AF_INET6 as u8;
+const_assert_eq!(AF_INET6_U8 as i32, AF_INET6);
+
+#[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
+const AF_UNSPEC_U8: u8 = AF_UNSPEC as u8;
+const_assert_eq!(AF_UNSPEC_U8 as i32, AF_UNSPEC);
+
+#[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
+const NLM_F_REQUEST_U16: u16 = NLM_F_REQUEST as u16;
+const_assert_eq!(NLM_F_REQUEST_U16 as c_int, NLM_F_REQUEST);
+
+#[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
+const NLM_F_ACK_U16: u16 = NLM_F_ACK as u16;
+const_assert_eq!(NLM_F_ACK_U16 as c_int, NLM_F_ACK);
+
+const_assert!(size_of::<nlmsghdr>() <= u8::MAX as usize);
+const_assert!(size_of::<rtmsg>() <= u8::MAX as usize);
+const_assert!(size_of::<rtattr>() <= u8::MAX as usize);
+const_assert!(size_of::<ifinfomsg>() <= u8::MAX as usize);
 
 const NETLINK_BUFFER_SIZE: usize = 8192; // See netlink(7) man page.
 
@@ -70,40 +96,30 @@ fn addr_bytes(remote: &IpAddr) -> Vec<u8> {
     }
 }
 
-fn prepare_nlmsg(
-    nlmsg_type: c_ushort,
-    nlmsg_len: usize,
-    nlmsg_seq: u32,
-) -> Result<nlmsghdr, Error> {
+const fn prepare_nlmsg(nlmsg_type: c_ushort, nlmsg_len: u32, nlmsg_seq: u32) -> libc::nlmsghdr {
     let mut nlm = unsafe { mem::zeroed::<nlmsghdr>() };
-    nlm.nlmsg_len = nlmsg_len
-        .try_into()
-        .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?;
+    nlm.nlmsg_len = nlmsg_len;
     nlm.nlmsg_type = nlmsg_type;
-    nlm.nlmsg_flags = (NLM_F_REQUEST | NLM_F_ACK)
-        .try_into()
-        .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?;
+    nlm.nlmsg_flags = NLM_F_REQUEST_U16 | NLM_F_ACK_U16;
     nlm.nlmsg_seq = nlmsg_seq;
-    Ok(nlm)
+    nlm
 }
 
 fn if_index(remote: IpAddr, fd: BorrowedFd) -> Result<i32, Error> {
     // Prepare RTM_GETROUTE message.
-    let nlmsg_len = mem::size_of::<nlmsghdr>()
+    #[allow(clippy::cast_possible_truncation)]
+    // Structs lens are <= u8::MAX per `const_assert!`s above; `addr_bytes` is max. 16 for IPv6.
+    let nlmsg_len = (mem::size_of::<nlmsghdr>()
         + mem::size_of::<rtmsg>()
         + mem::size_of::<rtattr>()
-        + addr_bytes(&remote).len();
+        + addr_bytes(&remote).len()) as u32;
     let nlmsg_seq = 1;
-    let hdr = prepare_nlmsg(RTM_GETROUTE, nlmsg_len, nlmsg_seq)?;
+    let hdr = prepare_nlmsg(RTM_GETROUTE, nlmsg_len, nlmsg_seq);
 
     let mut rtm = unsafe { mem::zeroed::<rtmsg>() };
     rtm.rtm_family = match remote {
-        IpAddr::V4(_) => AF_INET
-            .try_into()
-            .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?,
-        IpAddr::V6(_) => AF_INET6
-            .try_into()
-            .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?,
+        IpAddr::V4(_) => AF_INET_U8,
+        IpAddr::V6(_) => AF_INET6_U8,
     };
     rtm.rtm_dst_len = addr_len(&remote);
     rtm.rtm_table = RT_TABLE_MAIN;
@@ -111,12 +127,13 @@ fn if_index(remote: IpAddr, fd: BorrowedFd) -> Result<i32, Error> {
     rtm.rtm_type = RTN_UNICAST;
 
     let mut attr = unsafe { mem::zeroed::<rtattr>() };
-    attr.rta_len = (mem::size_of::<rtattr>() + addr_bytes(&remote).len())
-        .try_into()
-        .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?;
+    #[allow(clippy::cast_possible_truncation)]
+    // Structs len is <= u8::MAX per `const_assert!` above; `addr_bytes` is max. 16 for IPv6.
+    let rta_len = (mem::size_of::<rtattr>() + addr_bytes(&remote).len()) as u16;
+    attr.rta_len = rta_len;
     attr.rta_type = RTA_DST;
 
-    let mut buf = vec![0u8; nlmsg_len];
+    let mut buf = vec![0u8; nlmsg_len as usize];
     unsafe {
         ptr::copy_nonoverlapping(
             ptr::from_ref(&hdr).cast(),
@@ -155,13 +172,11 @@ fn if_index(remote: IpAddr, fd: BorrowedFd) -> Result<i32, Error> {
         if len < 0 {
             return Err(Error::last_os_error());
         }
+        #[allow(clippy::cast_sign_loss)] // We handled negative sizes above, so this is OK.
+        let len = len as usize;
 
         let mut offset = 0;
-        while offset
-            < len
-                .try_into()
-                .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?
-        {
+        while offset < len {
             let hdr = unsafe { ptr::read_unaligned(buf.as_ptr().add(offset).cast::<nlmsghdr>()) };
             if hdr.nlmsg_seq == nlmsg_seq && hdr.nlmsg_type == RTM_NEWROUTE {
                 // This is the response, parse through the attributes to find the interface index.
@@ -190,18 +205,18 @@ fn if_index(remote: IpAddr, fd: BorrowedFd) -> Result<i32, Error> {
 fn if_name_mtu(if_index: i32, fd: BorrowedFd) -> Result<(String, usize), Error> {
     // Prepare RTM_GETLINK message to get the interface name and MTU for the interface with the
     // obtained index.
-    let nlmsg_len = mem::size_of::<nlmsghdr>() + mem::size_of::<ifinfomsg>();
+    #[allow(clippy::cast_possible_truncation)]
+    // Structs lens are <= u8::MAX per `const_assert!`s above.
+    let nlmsg_len = (mem::size_of::<nlmsghdr>() + mem::size_of::<ifinfomsg>()) as u32;
     let nlmsg_seq = 2;
-    let hdr = prepare_nlmsg(RTM_GETLINK, nlmsg_len, nlmsg_seq)?;
+    let hdr = prepare_nlmsg(RTM_GETLINK, nlmsg_len, nlmsg_seq);
 
     let mut ifim: ifinfomsg = unsafe { mem::zeroed() };
-    ifim.ifi_family = AF_UNSPEC
-        .try_into()
-        .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?;
+    ifim.ifi_family = AF_UNSPEC_U8;
     ifim.ifi_type = ARPHRD_NONE;
     ifim.ifi_index = if_index;
 
-    let mut buf = vec![0u8; nlmsg_len];
+    let mut buf = vec![0u8; nlmsg_len as usize];
     unsafe {
         ptr::copy_nonoverlapping(
             ptr::from_ref(&hdr).cast(),
@@ -229,13 +244,11 @@ fn if_name_mtu(if_index: i32, fd: BorrowedFd) -> Result<(String, usize), Error> 
         if len < 0 {
             return Err(Error::last_os_error());
         }
+        #[allow(clippy::cast_sign_loss)] // We handled negative sizes above, so this is OK.
+        let len = len as usize;
 
         let mut offset = 0;
-        while offset
-            < len
-                .try_into()
-                .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?
-        {
+        while offset < len {
             let hdr = unsafe { ptr::read_unaligned(buf.as_ptr().add(offset).cast::<nlmsghdr>()) };
             if hdr.nlmsg_seq == nlmsg_seq && hdr.nlmsg_type == RTM_NEWLINK {
                 let mut attr_ptr = unsafe {
@@ -257,7 +270,7 @@ fn if_name_mtu(if_index: i32, fd: BorrowedFd) -> Result<(String, usize), Error> 
                         mtu = Some(
                             unsafe {
                                 ptr::read_unaligned(
-                                    attr_ptr.add(mem::size_of::<rtattr>()).cast::<i32>(),
+                                    attr_ptr.add(mem::size_of::<rtattr>()).cast::<c_uint>(),
                                 )
                             }
                             .try_into()

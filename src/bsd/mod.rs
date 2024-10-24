@@ -14,22 +14,21 @@ use std::{
     ptr, slice, str,
 };
 
-#[cfg(not(target_os = "openbsd"))]
-use libc::RTA_IFP;
 use libc::{
     freeifaddrs, getifaddrs, getpid, if_data, ifaddrs, read, sockaddr_dl, sockaddr_in,
     sockaddr_in6, sockaddr_storage, socket, write, AF_INET, AF_INET6, AF_LINK, AF_UNSPEC, PF_ROUTE,
-    RTAX_IFA, RTAX_IFP, RTAX_MAX, RTA_DST, RTM_GET, RTM_VERSION, SOCK_RAW,
+    RTAX_IFA, RTAX_IFP, RTAX_MAX, RTM_GET, RTM_VERSION, SOCK_RAW,
 };
+use static_assertions::{const_assert, const_assert_eq};
 
 #[cfg(apple)]
-use crate::bsd::apple::{rt_msghdr, ALIGN};
+use crate::bsd::apple::{rt_msghdr, ALIGN, RTM_ADDRS};
 #[cfg(target_os = "freebsd")]
-use crate::bsd::freebsd::{rt_msghdr, ALIGN};
+use crate::bsd::freebsd::{rt_msghdr, ALIGN, RTM_ADDRS};
 #[cfg(target_os = "netbsd")]
-use crate::bsd::netbsd::{rt_msghdr, ALIGN};
+use crate::bsd::netbsd::{rt_msghdr, ALIGN, RTM_ADDRS};
 #[cfg(target_os = "openbsd")]
-use crate::bsd::openbsd::{rt_msghdr, ALIGN};
+use crate::bsd::openbsd::{rt_msghdr, ALIGN, RTM_ADDRS};
 
 #[cfg(apple)]
 mod apple;
@@ -45,6 +44,30 @@ mod openbsd;
 
 use crate::{aligned_by, default_err, unlikely_err};
 
+#[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
+const AF_INET_U8: u8 = AF_INET as u8;
+const_assert_eq!(AF_INET_U8 as i32, AF_INET);
+
+#[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
+const AF_INET6_U8: u8 = AF_INET6 as u8;
+const_assert_eq!(AF_INET6_U8 as i32, AF_INET6);
+
+#[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
+const AF_LINK_U8: u8 = AF_LINK as u8;
+const_assert_eq!(AF_LINK_U8 as i32, AF_LINK);
+
+#[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
+const RTM_VERSION_U8: u8 = RTM_VERSION as u8;
+const_assert_eq!(RTM_VERSION_U8 as i32, RTM_VERSION);
+
+#[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
+const RTM_GET_U8: u8 = RTM_GET as u8;
+const_assert_eq!(RTM_GET_U8 as i32, RTM_GET);
+
+const_assert!(size_of::<sockaddr_in>() <= u8::MAX as usize);
+const_assert!(size_of::<sockaddr_in6>() <= u8::MAX as usize);
+const_assert!(size_of::<rt_msghdr>() <= u8::MAX as usize);
+
 fn get_mtu_for_interface(name: &str) -> Result<usize, Error> {
     let mut ifap: *mut ifaddrs = ptr::null_mut();
     if unsafe { getifaddrs(&mut ifap) } != 0 {
@@ -53,54 +76,45 @@ fn get_mtu_for_interface(name: &str) -> Result<usize, Error> {
     let ifap = ifap; // Do not modify this pointer.
     let mut res = Err(default_err());
 
-    let mut cursor = ifap;
-    while !cursor.is_null() {
-        let ifa = unsafe { &*cursor };
+    let mut ifa_next = ifap;
+    while !ifa_next.is_null() {
+        let ifa = unsafe { &*ifa_next };
         if !ifa.ifa_addr.is_null() {
-            let saddr = unsafe { &*ifa.ifa_addr };
+            let ifa_addr = unsafe { &*ifa.ifa_addr };
             let ifa_name = unsafe { CStr::from_ptr(ifa.ifa_name).to_str().unwrap_or_default() };
-            if libc::c_int::from(saddr.sa_family) == AF_LINK
-                && !ifa.ifa_data.is_null()
-                && ifa_name == name
-            {
-                let data = unsafe { &*(ifa.ifa_data as *const if_data) };
-                if let Ok(mtu) = usize::try_from(data.ifi_mtu) {
+            if ifa_addr.sa_family == AF_LINK_U8 && !ifa.ifa_data.is_null() && ifa_name == name {
+                let ifa_data = unsafe { &*(ifa.ifa_data as *const if_data) };
+                if let Ok(mtu) = usize::try_from(ifa_data.ifi_mtu) {
                     res = Ok(mtu);
                     break;
                 }
             }
         }
-        cursor = ifa.ifa_next;
+        ifa_next = ifa.ifa_next;
     }
     unsafe { freeifaddrs(ifap) };
     res
 }
 
-fn as_sockaddr_storage(ip: IpAddr) -> Result<sockaddr_storage, Error> {
+fn as_sockaddr_storage(ip: IpAddr) -> sockaddr_storage {
     let mut dst: sockaddr_storage = unsafe { mem::zeroed() };
     match ip {
+        #[allow(clippy::cast_possible_truncation)] // Guarded by `const_assert!` above.
         IpAddr::V4(ip) => {
             let sin = unsafe { &mut *ptr::from_mut(&mut dst).cast::<sockaddr_in>() };
-            sin.sin_len = size_of::<sockaddr_in>()
-                .try_into()
-                .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?;
-            sin.sin_family = AF_INET
-                .try_into()
-                .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?;
+            sin.sin_len = size_of::<sockaddr_in>() as u8;
+            sin.sin_family = AF_INET_U8;
             sin.sin_addr.s_addr = u32::from_ne_bytes(ip.octets());
         }
+        #[allow(clippy::cast_possible_truncation)] // Guarded by `const_assert!` above.
         IpAddr::V6(ip) => {
             let sin6 = unsafe { &mut *ptr::from_mut(&mut dst).cast::<sockaddr_in6>() };
-            sin6.sin6_len = size_of::<sockaddr_in6>()
-                .try_into()
-                .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?;
-            sin6.sin6_family = AF_INET6
-                .try_into()
-                .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?;
+            sin6.sin6_len = size_of::<sockaddr_in6>() as u8;
+            sin6.sin6_family = AF_INET6_U8;
             sin6.sin6_addr.s6_addr = ip.octets();
         }
     };
-    Ok(dst)
+    dst
 }
 
 pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> {
@@ -112,30 +126,21 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
     let fd = unsafe { OwnedFd::from_raw_fd(fd) };
 
     // Prepare buffer with destination `sockaddr`.
-    let dst = as_sockaddr_storage(remote)?;
+    let dst = as_sockaddr_storage(remote);
 
     // Prepare route message structure.
     let mut query: rt_msghdr = unsafe { mem::zeroed() };
-    query.rtm_msglen = (size_of::<rt_msghdr>() + aligned_by(dst.ss_len.into(), ALIGN)) // Length includes sockaddr
-        .try_into()
-        .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?;
-    query.rtm_version = RTM_VERSION
-        .try_into()
-        .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?;
-    query.rtm_type = RTM_GET
-        .try_into()
-        .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?;
+    #[allow(clippy::cast_possible_truncation)]
+    // Structs len is <= u8::MAX per `const_assert!`s above; `aligned_by` returns max. 16 for IPv6.
+    let rtm_msglen = (size_of::<rt_msghdr>() + aligned_by(dst.ss_len.into(), ALIGN)) as u16; // Length includes sockaddr
+    query.rtm_msglen = rtm_msglen;
+    query.rtm_version = RTM_VERSION_U8;
+    query.rtm_type = RTM_GET_U8;
     query.rtm_seq = fd.as_raw_fd(); // Abuse file descriptor as sequence number, since it's unique
-    query.rtm_addrs = RTA_DST; // Query for destination
-    #[cfg(not(target_os = "openbsd"))]
-    {
-        query.rtm_addrs |= RTA_IFP; // Obtain interface info
-    }
+    query.rtm_addrs = RTM_ADDRS;
     #[cfg(target_os = "openbsd")]
     {
-        query.rtm_hdrlen = size_of::<rt_msghdr>()
-            .try_into()
-            .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?;
+        query.rtm_hdrlen = size_of::<rt_msghdr>() as libc::c_ushort;
     }
 
     // Copy route message and destination `sockaddr` into message buffer.
@@ -189,12 +194,7 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
         // Check if the address is present in the message
         if rtm.rtm_addrs & (1 << i) != 0 {
             // Check if the address is the interface address
-            if (i == RTAX_IFP || i == RTAX_IFA)
-                && sdl.sdl_family
-                    == AF_LINK
-                        .try_into()
-                        .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?
-                && sdl.sdl_nlen > 0
+            if (i == RTAX_IFP || i == RTAX_IFA) && sdl.sdl_family == AF_LINK_U8 && sdl.sdl_nlen > 0
             {
                 let if_name = unsafe {
                     slice::from_raw_parts(sdl.sdl_data.as_ptr().cast(), sdl.sdl_nlen.into())
