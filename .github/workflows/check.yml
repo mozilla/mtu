@@ -297,7 +297,7 @@ jobs:
             /sbin/ifconfig
             cargo check --all-targets
             cargo clippy
-            llvm-profdata RUST_LOG=trace cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
+            RUST_LOG=trace cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
 
       - if: matrix.os == 'solaris'
         uses: vmactions/solaris-vm@a89b9438868c70db27e41625f0a5de6ff5e90809
