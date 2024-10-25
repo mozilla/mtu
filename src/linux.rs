@@ -6,7 +6,7 @@
 
 use std::{
     ffi::CStr,
-    io::Error,
+    io::{Error, ErrorKind},
     mem::{size_of, zeroed},
     net::IpAddr,
     num::TryFromIntError,
@@ -22,7 +22,7 @@ use libc::{
 };
 use static_assertions::{const_assert, const_assert_eq};
 
-use crate::{aligned_by, default_err, unlikely_err};
+use crate::{aligned_by, default_err};
 
 #[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
 const AF_INET_U8: u8 = AF_INET as u8;
@@ -88,6 +88,12 @@ struct rtattr {
     rta_len: c_ushort,  // Length of option
     rta_type: c_ushort, // Type of option
 } // Data follows
+
+/// Prepare an error for cases that "should never happen".
+fn unlikely_err(msg: String) -> Error {
+    debug_assert!(false, "{msg}");
+    Error::new(ErrorKind::Other, msg)
+}
 
 const fn addr_len(remote: &IpAddr) -> u8 {
     match remote {

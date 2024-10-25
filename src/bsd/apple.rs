@@ -4,11 +4,9 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use libc::{RTA_DST, RTA_IFP};
+pub const RTM_ADDRS: i32 = libc::RTA_DST;
 
 pub const ALIGN: usize = 4;
-
-pub const RTM_ADDRS: i32 = RTA_DST | RTA_IFP;
 
 #[allow(non_camel_case_types)]
 pub type rt_msghdr = libc::rt_msghdr;

@@ -9,15 +9,14 @@ use std::{
     io::Error,
     mem::{size_of, zeroed},
     net::IpAddr,
-    num::TryFromIntError,
     os::fd::{AsRawFd, FromRawFd, OwnedFd},
-    ptr, slice, str,
+    ptr,
 };
 
 use libc::{
-    freeifaddrs, getifaddrs, getpid, if_data, ifaddrs, read, sockaddr_dl, sockaddr_in,
+    freeifaddrs, getifaddrs, getpid, if_data, if_indextoname, ifaddrs, read, sockaddr_in,
     sockaddr_in6, sockaddr_storage, socket, write, AF_INET, AF_INET6, AF_LINK, AF_UNSPEC, PF_ROUTE,
-    RTAX_IFA, RTAX_IFP, RTAX_MAX, RTM_GET, RTM_VERSION, SOCK_RAW,
+    RTAX_MAX, RTM_GET, RTM_VERSION, SOCK_RAW,
 };
 use static_assertions::{const_assert, const_assert_eq};
 
@@ -42,7 +41,7 @@ mod netbsd;
 #[cfg(target_os = "openbsd")]
 mod openbsd;
 
-use crate::{aligned_by, default_err, unlikely_err};
+use crate::{aligned_by, default_err};
 
 #[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
 const AF_INET_U8: u8 = AF_INET as u8;
@@ -68,32 +67,50 @@ const_assert!(size_of::<sockaddr_in>() <= u8::MAX as usize);
 const_assert!(size_of::<sockaddr_in6>() <= u8::MAX as usize);
 const_assert!(size_of::<rt_msghdr>() <= u8::MAX as usize);
 
-fn get_mtu_for_interface(name: &str) -> Result<usize, Error> {
-    let mut ifap: *mut ifaddrs = ptr::null_mut();
-    if unsafe { getifaddrs(&mut ifap) } != 0 {
+struct IfAddrPtr(*mut ifaddrs);
+
+impl Drop for IfAddrPtr {
+    fn drop(&mut self) {
+        unsafe { freeifaddrs(self.0) };
+    }
+}
+
+pub fn if_name_mtu(idx: u32) -> Result<(String, usize), Error> {
+    let mut name = [0; libc::IF_NAMESIZE];
+    if unsafe { if_indextoname(idx, name.as_mut_ptr()).is_null() } {
         return Err(Error::last_os_error());
     }
-    let ifap = ifap; // Do not modify this pointer.
-    let mut res = Err(default_err());
+    let name = unsafe {
+        CStr::from_ptr(name.as_ptr())
+            .to_str()
+            .map_err(|_| default_err())?
+    };
 
-    let mut ifa_next = ifap;
+    let mut ifap = IfAddrPtr(ptr::null_mut());
+    if unsafe { getifaddrs(ptr::from_mut(&mut ifap.0)) } != 0 {
+        return Err(Error::last_os_error());
+    }
+
+    let mut ifa_next = ifap.0;
     while !ifa_next.is_null() {
-        let ifa = unsafe { &*ifa_next };
+        let ifa = unsafe { *ifa_next };
         if !ifa.ifa_addr.is_null() {
-            let ifa_addr = unsafe { &*ifa.ifa_addr };
-            let ifa_name = unsafe { CStr::from_ptr(ifa.ifa_name).to_str().unwrap_or_default() };
+            let ifa_addr = unsafe { *ifa.ifa_addr };
+            let ifa_name = unsafe {
+                CStr::from_ptr(ifa.ifa_name)
+                    .to_str()
+                    .map_err(|_| default_err())?
+            };
             if ifa_addr.sa_family == AF_LINK_U8 && !ifa.ifa_data.is_null() && ifa_name == name {
-                let ifa_data = unsafe { &*(ifa.ifa_data as *const if_data) };
+                let ifa_data = unsafe { *(ifa.ifa_data as *const if_data) };
                 if let Ok(mtu) = usize::try_from(ifa_data.ifi_mtu) {
-                    res = Ok(mtu);
-                    break;
+                    return Ok((name.to_string(), mtu));
                 }
             }
         }
         ifa_next = ifa.ifa_next;
     }
-    unsafe { freeifaddrs(ifap) };
-    res
+    Err(default_err())
 }
 
 fn as_sockaddr_storage(ip: IpAddr) -> sockaddr_storage {
@@ -117,7 +134,7 @@ fn as_sockaddr_storage(ip: IpAddr) -> sockaddr_storage {
     dst
 }
 
-pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> {
+pub fn if_index(remote: IpAddr) -> Result<u16, Error> {
     // Open route socket.
     let fd = unsafe { socket(PF_ROUTE, SOCK_RAW, AF_UNSPEC) };
     if fd == -1 {
@@ -153,7 +170,8 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
         );
         ptr::copy_nonoverlapping(
             ptr::from_ref(&dst).cast(),
-            msg.as_mut_ptr().add(size_of::<rt_msghdr>()),
+            msg.as_mut_ptr()
+                .add(aligned_by(size_of::<rt_msghdr>(), ALIGN)),
             dst.ss_len.into(),
         );
     }
@@ -171,53 +189,28 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
         // There will never be `RTAX_MAX` sockaddrs attached, but it's a safe upper bound.
          (RTAX_MAX as usize * size_of::<sockaddr_storage>())
     ];
-    let rtm = loop {
+    loop {
         let len = unsafe { read(fd.as_raw_fd(), buf.as_mut_ptr().cast(), buf.len()) };
         if len <= 0 {
             return Err(Error::last_os_error());
         }
         let reply = unsafe { ptr::read_unaligned(buf.as_ptr().cast::<rt_msghdr>()) };
         if reply.rtm_version == query.rtm_version
-            && reply.rtm_type == query.rtm_type
             && reply.rtm_pid == unsafe { getpid() }
             && reply.rtm_seq == query.rtm_seq
         {
-            // This is the reply we are looking for.
-            break reply;
-        }
-    };
-
-    // Parse the route message for the interface name.
-    let mut sa = unsafe { buf.as_ptr().add(size_of::<rt_msghdr>()) };
-    for i in 0..RTAX_MAX {
-        let sdl = unsafe { ptr::read_unaligned(sa.cast::<sockaddr_dl>()) };
-        // Check if the address is present in the message
-        if rtm.rtm_addrs & (1 << i) != 0 {
-            // Check if the address is the interface address
-            if (i == RTAX_IFP || i == RTAX_IFA) && sdl.sdl_family == AF_LINK_U8 && sdl.sdl_nlen > 0
-            {
-                let if_name = unsafe {
-                    slice::from_raw_parts(sdl.sdl_data.as_ptr().cast(), sdl.sdl_nlen.into())
-                };
-                if let Ok(if_name) = str::from_utf8(if_name) {
-                    // We have our interface name.
-                    // If rtm.rtm_rmx.rmx_mtu is 0, which can happen on OpenBSD and NetBSD, we need
-                    // to get the MTU via different means based on the interface name.
-                    let mtu = if rtm.rtm_rmx.rmx_mtu > 0 {
-                        rtm.rtm_rmx
-                            .rmx_mtu
-                            .try_into()
-                            .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?
-                    } else {
-                        get_mtu_for_interface(if_name)?
-                    };
-                    return Ok((if_name.to_string(), mtu));
-                }
-            }
-            let incr = aligned_by(sdl.sdl_len.into(), ALIGN);
-            sa = unsafe { sa.add(incr) };
+            // This is a reply to our query.
+            return if reply.rtm_type == query.rtm_type {
+                // This is *the* reply we are looking for.
+                Ok(reply.rtm_index)
+            } else {
+                Err(default_err())
+            };
         }
     }
+}
 
-    Err(default_err())
+pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> {
+    let if_index = if_index(remote)?;
+    if_name_mtu(if_index.into())
 }

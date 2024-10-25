@@ -68,13 +68,6 @@ fn default_err() -> Error {
     Error::new(ErrorKind::NotFound, "Local interface MTU not found")
 }
 
-/// Prepare an error for cases that "should never happen".
-#[cfg(not(target_os = "windows"))]
-fn unlikely_err(msg: String) -> Error {
-    debug_assert!(false, "{msg}");
-    Error::new(ErrorKind::Other, msg)
-}
-
 /// Align `size` to the next multiple of `align` (which needs to be a power of two).
 #[cfg(not(target_os = "windows"))]
 const fn aligned_by(size: usize, align: usize) -> usize {

@@ -4,7 +4,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-pub const RTM_ADDRS: i32 = libc::RTA_DST | libc::RTA_IFP;
+pub const RTM_ADDRS: i32 = libc::RTA_DST;
 
 // See https://github.com/freebsd/freebsd-src/blob/524a425d30fce3d5e47614db796046830b1f6a83/sys/net/route.h#L362-L371
 pub const ALIGN: usize = std::mem::size_of::<libc::c_long>();
