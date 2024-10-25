@@ -71,15 +71,18 @@ struct IfAddrPtr(*mut ifaddrs);
 
 impl Drop for IfAddrPtr {
     fn drop(&mut self) {
+        // Free the memory allocated by `getifaddrs`.
         unsafe { freeifaddrs(self.0) };
     }
 }
 
 pub fn if_name_mtu(idx: u32) -> Result<(String, usize), Error> {
     let mut name = [0; libc::IF_NAMESIZE];
+    // if_indextoname writes into the provided buffer.
     if unsafe { if_indextoname(idx, name.as_mut_ptr()).is_null() } {
         return Err(Error::last_os_error());
     }
+    // Convert to Rust string.
     let name = unsafe {
         CStr::from_ptr(name.as_ptr())
             .to_str()
@@ -87,11 +90,14 @@ pub fn if_name_mtu(idx: u32) -> Result<(String, usize), Error> {
     };
 
     let mut ifap = IfAddrPtr(ptr::null_mut());
+    // getifaddrs allocates memory for the linked list of interfaces that is freed by
+    // `IfAddrPtr::drop`.
     if unsafe { getifaddrs(ptr::from_mut(&mut ifap.0)) } != 0 {
         return Err(Error::last_os_error());
     }
 
     let mut ifa_next = ifap.0;
+    // All `unsafe` statements in this loop access memory initialized by `getifaddrs`.
     while !ifa_next.is_null() {
         let ifa = unsafe { *ifa_next };
         if !ifa.ifa_addr.is_null() {
@@ -118,6 +124,7 @@ fn as_sockaddr_storage(ip: IpAddr) -> sockaddr_storage {
     match ip {
         #[allow(clippy::cast_possible_truncation)] // Guarded by `const_assert!` above.
         IpAddr::V4(ip) => {
+            // Reinterpret the `sockaddr_storage` as `sockaddr_in`.
             let sin = unsafe { &mut *ptr::from_mut(&mut dst).cast::<sockaddr_in>() };
             sin.sin_len = size_of::<sockaddr_in>() as u8;
             sin.sin_family = AF_INET_U8;
@@ -125,6 +132,7 @@ fn as_sockaddr_storage(ip: IpAddr) -> sockaddr_storage {
         }
         #[allow(clippy::cast_possible_truncation)] // Guarded by `const_assert!` above.
         IpAddr::V6(ip) => {
+            // Reinterpret the `sockaddr_storage` as `sockaddr_in6`.
             let sin6 = unsafe { &mut *ptr::from_mut(&mut dst).cast::<sockaddr_in6>() };
             sin6.sin6_len = size_of::<sockaddr_in6>() as u8;
             sin6.sin6_family = AF_INET6_U8;
@@ -140,6 +148,7 @@ pub fn if_index(remote: IpAddr) -> Result<u16, Error> {
     if fd == -1 {
         return Err(Error::last_os_error());
     }
+    // Let OwnedFd take care of closing the file descriptor.
     let fd = unsafe { OwnedFd::from_raw_fd(fd) };
 
     // Prepare buffer with destination `sockaddr`.

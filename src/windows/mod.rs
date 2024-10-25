@@ -25,6 +25,15 @@ use crate::{
 #[allow(clippy::semicolon_if_nothing_returned, clippy::struct_field_names)]
 mod win_bindings;
 
+struct MibTablePtr(*mut MIB_IPINTERFACE_TABLE);
+
+impl Drop for MibTablePtr {
+    fn drop(&mut self) {
+        // Free the memory allocated by GetIpInterfaceTable.
+        unsafe { FreeMibTable(self.0 as *const c_void) };
+    }
+}
+
 pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> {
     // Convert remote to Windows SOCKADDR_INET format. The SOCKADDR_INET union contains an IPv4 or
     // an IPv6 address. We allocate and zero-initialize it here.
@@ -70,15 +79,16 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
     }
 
     // Get a list of all interfaces with associated metadata.
-    let mut if_table: *mut MIB_IPINTERFACE_TABLE = ptr::null_mut();
-    if unsafe { GetIpInterfaceTable(AF_UNSPEC, &mut if_table) } != NO_ERROR {
+    let mut if_table = MibTablePtr(ptr::null_mut());
+    // GetIpInterfaceTable allocates memory, which MibTablePtr::drop will free.
+    if unsafe { GetIpInterfaceTable(AF_UNSPEC, ptr::from_mut(&mut if_table.0)) } != NO_ERROR {
         return Err(Error::last_os_error());
     }
-    let if_table = if_table; // Do not modify this pointer.
+    // Make a slice
     let ifaces = unsafe {
         slice::from_raw_parts::<MIB_IPINTERFACE_ROW>(
-            &(*if_table).Table[0],
-            (*if_table).NumEntries as usize,
+            &(*if_table.0).Table[0],
+            (*if_table.0).NumEntries as usize,
         )
     };
 
@@ -87,11 +97,11 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
         if iface.InterfaceIndex == idx {
             if let Ok(mtu) = iface.NlMtu.try_into() {
                 let mut name = [0u8; 256]; // IF_NAMESIZE not available?
+                                           // if_indextoname writes into the provided buffer.
                 if unsafe { !if_indextoname(iface.InterfaceIndex, &mut name).is_null() } {
                     if let Ok(name) = CStr::from_bytes_until_nul(&name) {
                         if let Ok(name) = name.to_str() {
                             // We found our interface information.
-                            unsafe { FreeMibTable(if_table as *const c_void) };
                             return Ok((name.to_string(), mtu));
                         }
                     }
@@ -100,7 +110,5 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
             break;
         }
     }
-
-    unsafe { FreeMibTable(if_table as *const c_void) };
     Err(default_err())
 }

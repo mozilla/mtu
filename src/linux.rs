@@ -175,6 +175,7 @@ fn if_index(remote: IpAddr, fd: BorrowedFd) -> Result<i32, Error> {
     };
 
     // Send RTM_GETROUTE message to get the interface index associated with the destination.
+    // Accesses the initialized memory in `buf`.
     if unsafe { write(fd.as_raw_fd(), buf.as_ptr().cast(), buf.len()) } < 0 {
         return Err(Error::last_os_error());
     }
@@ -190,6 +191,7 @@ fn if_index(remote: IpAddr, fd: BorrowedFd) -> Result<i32, Error> {
         let len = len as usize;
 
         let mut offset = 0;
+        // All `unsafe` blocks are accessing memory initialized by `read` above.
         while offset < len {
             let hdr = unsafe { ptr::read_unaligned(buf.as_ptr().add(offset).cast::<nlmsghdr>()) };
             if hdr.nlmsg_seq == nlmsg_seq {
@@ -259,7 +261,7 @@ fn if_name_mtu(if_index: i32, fd: BorrowedFd) -> Result<(String, usize), Error> 
         );
     }
 
-    // Send RTM_GETLINK message.
+    // Send RTM_GETLINK message. Accesses the initialized memory in `buf`.
     if unsafe { write(fd.as_raw_fd(), buf.as_ptr().cast(), buf.len()) } < 0 {
         return Err(Error::last_os_error());
     }
@@ -277,6 +279,7 @@ fn if_name_mtu(if_index: i32, fd: BorrowedFd) -> Result<(String, usize), Error> 
         let len = len as usize;
 
         let mut offset = 0;
+        // All `unsafe` blocks are accessing memory initialized by `read` above.
         while offset < len {
             let hdr = unsafe { ptr::read_unaligned(buf.as_ptr().add(offset).cast::<nlmsghdr>()) };
             if hdr.nlmsg_seq == nlmsg_seq {
@@ -343,6 +346,7 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> 
     if fd == -1 {
         return Err(Error::last_os_error());
     }
+    // Let `OwnedFd` take care of closing the socket.
     let fd = unsafe { OwnedFd::from_raw_fd(fd) };
 
     let if_index = if_index(remote, fd.as_fd())?;
