@@ -20,26 +20,32 @@ use libc::{
 };
 use static_assertions::{const_assert, const_assert_eq};
 
-#[cfg(apple)]
-use crate::bsd::apple::{rt_msghdr, ALIGN, RTM_ADDRS};
-#[cfg(target_os = "freebsd")]
-use crate::bsd::freebsd::{rt_msghdr, ALIGN, RTM_ADDRS};
-#[cfg(target_os = "netbsd")]
-use crate::bsd::netbsd::{rt_msghdr, ALIGN, RTM_ADDRS};
-#[cfg(target_os = "openbsd")]
-use crate::bsd::openbsd::{rt_msghdr, ALIGN, RTM_ADDRS};
+#[cfg(not(apple))]
+use crate::bsd::bindings::rt_msghdr;
 
-#[cfg(apple)]
-mod apple;
+#[cfg(not(apple))]
+#[allow(non_camel_case_types)]
+mod bindings {
+    include!(env!("BINDINGS"));
+}
 
-#[cfg(target_os = "freebsd")]
-mod freebsd;
+#[cfg(any(apple, target_os = "freebsd", target_os = "openbsd"))]
+const RTM_ADDRS: i32 = libc::RTA_DST;
 
 #[cfg(target_os = "netbsd")]
-mod netbsd;
+const RTM_ADDRS: i32 = libc::RTA_DST | libc::RTA_IFP;
 
-#[cfg(target_os = "openbsd")]
-mod openbsd;
+#[cfg(apple)]
+const ALIGN: usize = size_of::<libc::c_int>();
+
+#[cfg(any(target_os = "freebsd", target_os = "netbsd", target_os = "openbsd"))]
+// See https://github.com/freebsd/freebsd-src/blob/524a425d30fce3d5e47614db796046830b1f6a83/sys/net/route.h#L362-L371
+// See https://github.com/NetBSD/src/blob/4b50954e98313db58d189dd87b4541929efccb09/sys/net/route.h#L329-L331
+const ALIGN: usize = size_of::<libc::c_long>();
+
+#[cfg(apple)]
+#[allow(non_camel_case_types)]
+type rt_msghdr = libc::rt_msghdr;
 
 use crate::{aligned_by, default_err};
 
@@ -76,7 +82,7 @@ impl Drop for IfAddrPtr {
     }
 }
 
-pub fn if_name_mtu(idx: u32) -> Result<(String, usize), Error> {
+fn if_name_mtu(idx: u32) -> Result<(String, usize), Error> {
     let mut name = [0; libc::IF_NAMESIZE];
     // if_indextoname writes into the provided buffer.
     if unsafe { if_indextoname(idx, name.as_mut_ptr()).is_null() } {
@@ -142,7 +148,7 @@ fn as_sockaddr_storage(ip: IpAddr) -> sockaddr_storage {
     dst
 }
 
-pub fn if_index(remote: IpAddr) -> Result<u16, Error> {
+fn if_index(remote: IpAddr) -> Result<u16, Error> {
     // Open route socket.
     let fd = unsafe { socket(PF_ROUTE, SOCK_RAW, AF_UNSPEC) };
     if fd == -1 {

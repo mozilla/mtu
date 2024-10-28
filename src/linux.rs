@@ -4,6 +4,9 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+#![allow(clippy::struct_field_names)]
+include!(concat!(env!("OUT_DIR"), "/route.rs"));
+
 use std::{
     ffi::CStr,
     io::{Error, ErrorKind},
@@ -15,7 +18,7 @@ use std::{
 };
 
 use libc::{
-    c_int, c_uchar, c_uint, c_ushort, nlmsghdr, read, socket, write, AF_INET, AF_INET6, AF_NETLINK,
+    c_int, c_uint, c_ushort, nlmsghdr, read, socket, write, AF_INET, AF_INET6, AF_NETLINK,
     AF_UNSPEC, ARPHRD_NONE, IFLA_IFNAME, IFLA_MTU, NETLINK_ROUTE, NLMSG_ERROR, NLM_F_ACK,
     NLM_F_REQUEST, RTA_DST, RTA_OIF, RTM_GETLINK, RTM_GETROUTE, RTM_NEWLINK, RTM_NEWROUTE,
     RTN_UNICAST, RT_SCOPE_UNIVERSE, RT_TABLE_MAIN, SOCK_RAW,
@@ -54,40 +57,6 @@ const_assert!(size_of::<rtattr>() <= u8::MAX as usize);
 const_assert!(size_of::<ifinfomsg>() <= u8::MAX as usize);
 
 const NETLINK_BUFFER_SIZE: usize = 8192; // See netlink(7) man page.
-
-#[allow(non_camel_case_types, clippy::struct_field_names)]
-#[repr(C)]
-// See https://github.com/torvalds/linux/blob/98f7e32f20d28ec452afb208f9cffc08448a2652/include/uapi/linux/rtnetlink.h#L561-L568
-struct ifinfomsg {
-    ifi_family: c_uchar, // AF_UNSPEC
-    ifi_type: c_ushort,  // Device type
-    ifi_index: c_int,    // Interface index
-    ifi_flags: c_uint,   // Device flags
-    ifi_change: c_uint,  // change mask
-}
-
-#[allow(non_camel_case_types, clippy::struct_field_names)]
-#[repr(C)]
-// See https://github.com/torvalds/linux/blob/98f7e32f20d28ec452afb208f9cffc08448a2652/include/uapi/linux/rtnetlink.h#L237-L249
-struct rtmsg {
-    rtm_family: c_uchar,   // Address family of route
-    rtm_dst_len: c_uchar,  // Length of destination
-    rtm_src_len: c_uchar,  // Length of source
-    rtm_tos: c_uchar,      // TOS filter
-    rtm_table: c_uchar,    // Routing table ID; see RTA_TABLE below
-    rtm_protocol: c_uchar, // Routing protocol; see below
-    rtm_scope: c_uchar,    // See below
-    rtm_type: c_uchar,     // See below
-    rtm_flags: c_uint,
-}
-
-#[allow(non_camel_case_types)]
-#[repr(C)]
-// See https://github.com/torvalds/linux/blob/98f7e32f20d28ec452afb208f9cffc08448a2652/include/uapi/linux/rtnetlink.h#L211-L214
-struct rtattr {
-    rta_len: c_ushort,  // Length of option
-    rta_type: c_ushort, // Type of option
-} // Data follows
 
 /// Prepare an error for cases that "should never happen".
 fn unlikely_err(msg: String) -> Error {

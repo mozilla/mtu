@@ -12,18 +12,18 @@ use std::{
     ptr, slice,
 };
 
-use crate::{
-    default_err,
-    windows::win_bindings::{
-        if_indextoname, FreeMibTable, GetBestInterfaceEx, GetIpInterfaceTable, AF_INET, AF_INET6,
-        AF_UNSPEC, IN6_ADDR, IN6_ADDR_0, IN_ADDR, IN_ADDR_0, MIB_IPINTERFACE_ROW,
-        MIB_IPINTERFACE_TABLE, NO_ERROR, SOCKADDR, SOCKADDR_IN, SOCKADDR_IN6, SOCKADDR_INET,
-    },
+use bindings::{
+    if_indextoname, FreeMibTable, GetBestInterfaceEx, GetIpInterfaceTable, AF_INET, AF_INET6,
+    AF_UNSPEC, IN6_ADDR, IN6_ADDR_0, IN_ADDR, IN_ADDR_0, MIB_IPINTERFACE_ROW,
+    MIB_IPINTERFACE_TABLE, NO_ERROR, SOCKADDR, SOCKADDR_IN, SOCKADDR_IN6, SOCKADDR_INET,
 };
 
-// Though the module includes `allow(clippy::all)`, that doesn't seem to affect some lints
-#[allow(clippy::semicolon_if_nothing_returned, clippy::struct_field_names)]
-mod win_bindings;
+use crate::default_err;
+
+#[allow(non_camel_case_types, non_snake_case)]
+mod bindings {
+    include!(env!("BINDINGS"));
+}
 
 struct MibTablePtr(*mut MIB_IPINTERFACE_TABLE);
 
