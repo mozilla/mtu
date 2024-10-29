@@ -53,7 +53,6 @@ use bsd::interface_and_mtu_impl;
 use linux::interface_and_mtu_impl;
 #[cfg(target_os = "windows")]
 use windows::interface_and_mtu_impl;
-
 #[cfg(any(apple, bsd))]
 mod bsd;
 
@@ -63,9 +62,18 @@ mod linux;
 #[cfg(target_os = "windows")]
 mod windows;
 
+#[cfg(not(target_os = "windows"))]
+mod routesocket;
+
 /// Prepare a default error.
 fn default_err() -> Error {
     Error::new(ErrorKind::NotFound, "Local interface MTU not found")
+}
+
+/// Prepare an error for cases that "should never happen".
+fn unlikely_err(msg: String) -> Error {
+    debug_assert!(false, "{msg}");
+    Error::new(ErrorKind::Other, msg)
 }
 
 /// Align `size` to the next multiple of `align` (which needs to be a power of two).

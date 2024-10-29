@@ -34,7 +34,7 @@ windows-targets = "0.52"
 [build-dependencies]
 cfg_aliases = "0.2"
 
-[target.'cfg(not(any(apple, windows)))'.build-dependencies]
+[target.'cfg(not(windows))'.build-dependencies]
 bindgen = { version = "0.69.5" }
 
 [target.'cfg(windows)'.build-dependencies]
