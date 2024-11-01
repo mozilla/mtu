@@ -11,6 +11,7 @@ use std::{
     net::IpAddr,
     os::fd::AsRawFd,
     ptr, slice,
+    str::Utf8Error,
 };
 
 use libc::{
@@ -106,16 +107,35 @@ impl Drop for IfAddrs {
 
 struct IfAddrPtr(*mut ifaddrs);
 
+impl IfAddrPtr {
+    fn addr(&self) -> libc::sockaddr {
+        unsafe { *(*self.0).ifa_addr }
+    }
+
+    fn name(&self) -> Result<&str, Utf8Error> {
+        unsafe { CStr::from_ptr((*self.0).ifa_name).to_str() }
+    }
+
+    fn data(&self) -> Option<if_data> {
+        let ifa_data = unsafe { (*self.0).ifa_data };
+        if ifa_data.is_null() {
+            None
+        } else {
+            Some(unsafe { *(ifa_data as *const if_data) })
+        }
+    }
+}
+
 impl Iterator for IfAddrPtr {
-    type Item = ifaddrs;
+    type Item = Self;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.0.is_null() {
             return None;
         }
-        let ifa = unsafe { *self.0 };
-        self.0 = ifa.ifa_next;
-        Some(ifa)
+        let ifa = self.0;
+        self.0 = unsafe { (*ifa).ifa_next };
+        Some(Self(ifa))
     }
 }
 
@@ -133,17 +153,16 @@ fn if_name_mtu(idx: u32) -> Result<(String, usize), Error> {
     };
 
     for ifa in IfAddrs::new()?.iter() {
-        let ifa_addr = unsafe { *ifa.ifa_addr };
-        let ifa_name = unsafe {
-            CStr::from_ptr(ifa.ifa_name)
-                .to_str()
-                .map_err(|err| Error::new(ErrorKind::Other, err))?
-        };
-        if ifa_addr.sa_family == AF_LINK_U8 && !ifa.ifa_data.is_null() && ifa_name == name {
-            let ifa_data = unsafe { *(ifa.ifa_data as *const if_data) };
-            if let Ok(mtu) = usize::try_from(ifa_data.ifi_mtu) {
-                return Ok((name.to_string(), mtu));
+        let ifa_name = ifa
+            .name()
+            .map_err(|err| Error::new(ErrorKind::Other, err))?;
+        if ifa.addr().sa_family == AF_LINK_U8 && ifa_name == name {
+            if let Some(ifa_data) = ifa.data() {
+                if let Ok(mtu) = usize::try_from(ifa_data.ifi_mtu) {
+                    return Ok((name.to_string(), mtu));
+                }
             }
+            return Err(default_err());
         }
     }
     Err(default_err())
