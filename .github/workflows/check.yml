@@ -278,12 +278,12 @@ jobs:
           usesh: true
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE GITHUB_ACTIONS"
           prepare: |
-            pkg_add rust llvm # rustup doesn't support OpenBSD at all
+            pkg_add rust llvm-17 # rustup doesn't support OpenBSD at all
           run: |
             ifconfig
             cargo check --all-targets
             cargo clippy
-            export LIBCLANG_PATH=/usr/local/llvm16/lib
+            export LIBCLANG_PATH=/usr/local/llvm17/lib
             export RUST_LOG=trace
             cargo test --no-fail-fast
             cargo test --no-fail-fast --release
@@ -303,6 +303,7 @@ jobs:
             cargo check --all-targets
             cargo clippy
             export LIBCLANG_PATH=/usr/pkg/lib
+            find /usr/pkg/lib
             export RUST_LOG=trace
             cargo test --no-fail-fast
             # FIXME: error[E0463]: can't find crate for `profiler_builtins`
