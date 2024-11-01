@@ -230,20 +230,18 @@ impl RouteMessage {
     const fn kind(&self) -> u8 {
         self.rtm.rtm_type
     }
+
+    const fn len(&self) -> usize {
+        self.rtm.rtm_msglen as usize
+    }
 }
 
-// See FIXME below.
-//
-// impl From<RouteMessage> for &[u8] {
-//     fn from(value: RouteMessage) -> Self {
-//         unsafe {
-//             slice::from_raw_parts(
-//                 ptr::from_ref(&value).cast(),
-//                 size_of::<rt_msghdr>() + aligned_by(value.sa.len().into(), ALIGN),
-//             )
-//         }
-//     }
-// }
+impl From<&RouteMessage> for &[u8] {
+    fn from(value: &RouteMessage) -> Self {
+        debug_assert!(value.len() >= size_of::<Self>());
+        unsafe { slice::from_raw_parts(ptr::from_ref(value).cast(), value.len()) }
+    }
+}
 
 impl From<Vec<u8>> for rt_msghdr {
     fn from(value: Vec<u8>) -> Self {
@@ -257,19 +255,11 @@ fn if_index(remote: IpAddr) -> Result<u16, Error> {
     let mut fd = RouteSocket::new(PF_ROUTE, AF_UNSPEC)?;
 
     // Send route message.
-    let query = RouteMessage::new(remote, fd.as_raw_fd());
+    let query = &RouteMessage::new(remote, fd.as_raw_fd());
     let query_version = query.version();
     let query_seq = query.seq();
     let query_type = query.kind();
-    // FIXME: Why is this not working in in release mode?
-    // fd.write_all(query.into())?;
-    // Why does this work?
-    fd.write_all(unsafe {
-        slice::from_raw_parts(
-            ptr::from_ref(&query).cast(),
-            size_of::<rt_msghdr>() + aligned_by(query.sa.len().into(), ALIGN),
-        )
-    })?;
+    fd.write_all(query.into())?;
 
     // Read route messages.
     let pid = unsafe { getpid() };

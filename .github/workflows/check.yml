@@ -283,6 +283,7 @@ jobs:
             ifconfig
             cargo check --all-targets
             cargo clippy
+            export LIBCLANG_PATH=/usr/local/llvm16/lib
             export RUST_LOG=trace
             cargo test --no-fail-fast
             cargo test --no-fail-fast --release
@@ -301,7 +302,7 @@ jobs:
             /sbin/ifconfig
             cargo check --all-targets
             cargo clippy
-            export LIBCLANG_PATH=/usr/local/llvm16/lib
+            export LIBCLANG_PATH=/usr/pkg/lib
             export RUST_LOG=trace
             cargo test --no-fail-fast
             # FIXME: error[E0463]: can't find crate for `profiler_builtins`
