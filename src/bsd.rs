@@ -232,16 +232,18 @@ impl RouteMessage {
     }
 }
 
-impl From<RouteMessage> for &[u8] {
-    fn from(value: RouteMessage) -> Self {
-        unsafe {
-            slice::from_raw_parts(
-                ptr::from_ref(&value).cast(),
-                size_of::<rt_msghdr>() + aligned_by(value.sa.len().into(), ALIGN),
-            )
-        }
-    }
-}
+// See FIXME below.
+//
+// impl From<RouteMessage> for &[u8] {
+//     fn from(value: RouteMessage) -> Self {
+//         unsafe {
+//             slice::from_raw_parts(
+//                 ptr::from_ref(&value).cast(),
+//                 size_of::<rt_msghdr>() + aligned_by(value.sa.len().into(), ALIGN),
+//             )
+//         }
+//     }
+// }
 
 impl From<Vec<u8>> for rt_msghdr {
     fn from(value: Vec<u8>) -> Self {
@@ -259,7 +261,15 @@ fn if_index(remote: IpAddr) -> Result<u16, Error> {
     let query_version = query.version();
     let query_seq = query.seq();
     let query_type = query.kind();
-    fd.write_all(query.into())?;
+    // FIXME: Why is this not working in in release mode?
+    // fd.write_all(query.into())?;
+    // Why does this work?
+    fd.write_all(unsafe {
+        slice::from_raw_parts(
+            ptr::from_ref(&query).cast(),
+            size_of::<rt_msghdr>() + aligned_by(query.sa.len().into(), ALIGN),
+        )
+    })?;
 
     // Read route messages.
     let pid = unsafe { getpid() };
