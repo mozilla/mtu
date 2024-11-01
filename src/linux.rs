@@ -98,12 +98,6 @@ impl From<AddrBytes> for [u8; 16] {
     }
 }
 
-impl Default for AddrBytes {
-    fn default() -> Self {
-        Self::V6([0; 16])
-    }
-}
-
 #[repr(C)]
 #[derive(Default)]
 struct IfIndexMsg {
@@ -172,13 +166,6 @@ impl From<&IfIndexMsg> for &[u8] {
 
 impl From<&[u8]> for nlmsghdr {
     fn from(value: &[u8]) -> Self {
-        debug_assert!(value.len() >= size_of::<Self>());
-        unsafe { ptr::read_unaligned(value.as_ptr().cast()) }
-    }
-}
-
-impl From<Vec<u8>> for rtattr {
-    fn from(value: Vec<u8>) -> Self {
         debug_assert!(value.len() >= size_of::<Self>());
         unsafe { ptr::read_unaligned(value.as_ptr().cast()) }
     }
