@@ -71,20 +71,51 @@ const_assert!(size_of::<sockaddr_in>() + ALIGN <= u8::MAX as usize);
 const_assert!(size_of::<sockaddr_in6>() + ALIGN <= u8::MAX as usize);
 const_assert!(size_of::<rt_msghdr>() <= u8::MAX as usize);
 
-struct IfAddrPtr(*mut ifaddrs);
+struct IfAddrs(*mut ifaddrs);
 
-impl Default for IfAddrPtr {
+impl Default for IfAddrs {
     fn default() -> Self {
         Self(ptr::null_mut())
     }
 }
 
-impl Drop for IfAddrPtr {
+impl IfAddrs {
+    fn new() -> Result<Self, Error> {
+        let mut ifap = Self::default();
+        // getifaddrs allocates memory for the linked list of interfaces that is freed by
+        // `IfAddrs::drop`.
+        if unsafe { getifaddrs(ptr::from_mut(&mut ifap.0)) } != 0 {
+            return Err(Error::last_os_error());
+        }
+        Ok(ifap)
+    }
+
+    const fn iter(&self) -> IfAddrPtr {
+        IfAddrPtr(self.0)
+    }
+}
+
+impl Drop for IfAddrs {
     fn drop(&mut self) {
         if !self.0.is_null() {
             // Free the memory allocated by `getifaddrs`.
             unsafe { freeifaddrs(self.0) };
         }
+    }
+}
+
+struct IfAddrPtr(*mut ifaddrs);
+
+impl Iterator for IfAddrPtr {
+    type Item = ifaddrs;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.0.is_null() {
+            return None;
+        }
+        let ifa = unsafe { *self.0 };
+        self.0 = ifa.ifa_next;
+        Some(ifa)
     }
 }
 
@@ -101,32 +132,19 @@ fn if_name_mtu(idx: u32) -> Result<(String, usize), Error> {
             .map_err(|err| Error::new(ErrorKind::Other, err))?
     };
 
-    let mut ifap = IfAddrPtr::default();
-    // getifaddrs allocates memory for the linked list of interfaces that is freed by
-    // `IfAddrPtr::drop`.
-    if unsafe { getifaddrs(ptr::from_mut(&mut ifap.0)) } != 0 {
-        return Err(Error::last_os_error());
-    }
-
-    let mut ifa_next = ifap.0;
-    // All `unsafe` statements in this loop access memory initialized by `getifaddrs`.
-    while !ifa_next.is_null() {
-        let ifa = unsafe { *ifa_next };
-        if !ifa.ifa_addr.is_null() {
-            let ifa_addr = unsafe { *ifa.ifa_addr };
-            let ifa_name = unsafe {
-                CStr::from_ptr(ifa.ifa_name)
-                    .to_str()
-                    .map_err(|err| Error::new(ErrorKind::Other, err))?
-            };
-            if ifa_addr.sa_family == AF_LINK_U8 && !ifa.ifa_data.is_null() && ifa_name == name {
-                let ifa_data = unsafe { *(ifa.ifa_data as *const if_data) };
-                if let Ok(mtu) = usize::try_from(ifa_data.ifi_mtu) {
-                    return Ok((name.to_string(), mtu));
-                }
+    for ifa in IfAddrs::new()?.iter() {
+        let ifa_addr = unsafe { *ifa.ifa_addr };
+        let ifa_name = unsafe {
+            CStr::from_ptr(ifa.ifa_name)
+                .to_str()
+                .map_err(|err| Error::new(ErrorKind::Other, err))?
+        };
+        if ifa_addr.sa_family == AF_LINK_U8 && !ifa.ifa_data.is_null() && ifa_name == name {
+            let ifa_data = unsafe { *(ifa.ifa_data as *const if_data) };
+            if let Ok(mtu) = usize::try_from(ifa_data.ifi_mtu) {
+                return Ok((name.to_string(), mtu));
             }
         }
-        ifa_next = ifa.ifa_next;
     }
     Err(default_err())
 }
