@@ -295,7 +295,7 @@ jobs:
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE GITHUB_ACTIONS"
           prepare: |
             /usr/sbin/pkg_add pkgin
-            pkgin install curl llvm
+            pkgin -y install curl llvm
           run: |
             sh rustup.sh --default-toolchain stable --component llvm-tools -y
             . "$HOME/.cargo/env"
