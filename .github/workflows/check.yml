@@ -260,7 +260,7 @@ jobs:
           usesh: true
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE GITHUB_ACTIONS"
           prepare: |
-            pkg install -y curl
+            pkg install -y curl llvm
           run: |
             sh rustup.sh --default-toolchain stable --component llvm-tools -y
             . "$HOME/.cargo/env"
@@ -276,7 +276,7 @@ jobs:
           usesh: true
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE GITHUB_ACTIONS"
           prepare: |
-            pkg_add rust # rustup doesn't support OpenBSD at all
+            pkg_add rust llvm # rustup doesn't support OpenBSD at all
           run: |
             ifconfig
             cargo check --all-targets
@@ -289,7 +289,7 @@ jobs:
           usesh: true
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE GITHUB_ACTIONS"
           prepare: |
-            /usr/sbin/pkg_add curl
+            /usr/sbin/pkg_add curl llvm
           run: |
             sh rustup.sh --default-toolchain stable --component llvm-tools -y
             . "$HOME/.cargo/env"
