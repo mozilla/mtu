@@ -6,7 +6,7 @@
 
 use std::{
     ffi::{c_void, CStr},
-    io::Error,
+    io::{Error, ErrorKind},
     net::IpAddr,
     ptr, slice,
 };

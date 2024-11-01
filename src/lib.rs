@@ -71,6 +71,7 @@ fn default_err() -> Error {
 }
 
 /// Prepare an error for cases that "should never happen".
+#[cfg(not(target_os = "windows"))]
 fn unlikely_err(msg: String) -> Error {
     debug_assert!(false, "{msg}");
     Error::new(ErrorKind::Other, msg)

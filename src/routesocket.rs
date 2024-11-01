@@ -55,6 +55,8 @@ impl Write for RouteSocket {
 
 impl Read for RouteSocket {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        // If we've written a well-formed message into the kernel via `write`, we should be able to
+        // read a well-formed message back out, and not block.
         let res = unsafe { read(self.as_raw_fd(), buf.as_mut_ptr().cast(), buf.len()) };
         check_result(res)
     }
