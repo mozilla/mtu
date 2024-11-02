@@ -87,16 +87,22 @@ jobs:
 
       - name: Check
         run: |
-          # shellcheck disable=SC2086
-          cargo +${{ matrix.rust-toolchain }} check $BUILD_TYPE --all-targets
+          OPTIONS=(--all-targets)
+          if [ "$BUILD_TYPE" ]; then
+            OPTIONS+=("$BUILD_TYPE")
+          fi
+          cargo +${{ matrix.rust-toolchain }} check "${OPTIONS[@]}"
 
       - name: Run tests and determine coverage
         env:
           RUST_LOG: trace
         run: |
-          # shellcheck disable=SC2086
+          OPTIONS=(--no-fail-fast --lcov --output-path lcov.info)
+          if [ "$BUILD_TYPE" ]; then
+            OPTIONS+=("$BUILD_TYPE")
+          fi
           if [ "${{ matrix.rust-toolchain }}" == "stable" ] && [ "${{ matrix.type }}" == "debug" ] && [ "${{endsWith(matrix.os, '-latest') && 'latest' || '' }}" == "latest" ]; then
-            cargo +${{ matrix.rust-toolchain }} llvm-cov test $BUILD_TYPE --no-fail-fast --lcov --output-path lcov.info
+            cargo +${{ matrix.rust-toolchain }} llvm-cov test "${OPTIONS[@]}"
           else
             if [ "${{ startsWith(matrix.os, 'windows') && 'windows' || '' }}" == "windows" ]; then
               # The codegen_windows_bindings test only succeeds when run via llvm-cov?!
@@ -264,11 +270,10 @@ jobs:
           run: |
             sh rustup.sh --default-toolchain stable --component llvm-tools -y
             . "$HOME/.cargo/env"
+            export RUST_LOG=trace
             cargo install cargo-llvm-cov --locked
-            ifconfig
             cargo check --all-targets
             cargo clippy
-            export RUST_LOG=trace
             cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
             cargo test --no-fail-fast --release
 
@@ -280,11 +285,10 @@ jobs:
           prepare: |
             pkg_add rust llvm-16.0.6p30 # rustup doesn't support OpenBSD at all
           run: |
-            ifconfig
-            cargo check --all-targets
-            cargo clippy
             export LIBCLANG_PATH=/usr/local/llvm16/lib
             export RUST_LOG=trace
+            cargo check --all-targets
+            cargo clippy
             cargo test --no-fail-fast
             cargo test --no-fail-fast --release
 
@@ -299,13 +303,12 @@ jobs:
           run: |
             sh rustup.sh --default-toolchain stable --component llvm-tools -y
             . "$HOME/.cargo/env"
+            export LIBCLANG_PATH=/usr/pkg/lib
+            export RUST_LOG=trace
             cargo install cargo-llvm-cov --locked
             /sbin/ifconfig
             cargo check --all-targets
             cargo clippy
-            export LIBCLANG_PATH=/usr/pkg/lib
-            find /usr/pkg/lib
-            export RUST_LOG=trace
             cargo test --no-fail-fast
             # FIXME: error[E0463]: can't find crate for `profiler_builtins`
             cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info || true
@@ -321,11 +324,10 @@ jobs:
           run: |
             sh rustup.sh --default-toolchain stable --component llvm-tools -y
             . "$HOME/.cargo/env"
+            export RUST_LOG=trace
             cargo install cargo-llvm-cov --locked
-            ifconfig
             cargo check --all-targets
             cargo clippy
-            export RUST_LOG=trace
             cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
             cargo test --no-fail-fast --release
 
