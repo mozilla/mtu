@@ -97,18 +97,18 @@ jobs:
         env:
           RUST_LOG: trace
         run: |
-          OPTIONS=(--no-fail-fast --lcov --output-path lcov.info)
+          OPTIONS=(--no-fail-fast)
           if [ "$BUILD_TYPE" ]; then
             OPTIONS+=("$BUILD_TYPE")
           fi
           if [ "${{ matrix.rust-toolchain }}" == "stable" ] && [ "${{ matrix.type }}" == "debug" ] && [ "${{endsWith(matrix.os, '-latest') && 'latest' || '' }}" == "latest" ]; then
-            cargo +${{ matrix.rust-toolchain }} llvm-cov test "${OPTIONS[@]}"
+            cargo +${{ matrix.rust-toolchain }} llvm-cov test "${OPTIONS[@]}" --lcov --output-path lcov.info
           else
             if [ "${{ startsWith(matrix.os, 'windows') && 'windows' || '' }}" == "windows" ]; then
               # The codegen_windows_bindings test only succeeds when run via llvm-cov?!
-              export FILTER="-- --skip codegen_windows_bindings"
+              OPTIONS+=(-- --skip codegen_windows_bindings)
             fi
-            cargo +${{ matrix.rust-toolchain }} test $BUILD_TYPE --no-fail-fast $FILTER
+            cargo +${{ matrix.rust-toolchain }} test "${OPTIONS[@]}"
           fi
           cargo +${{ matrix.rust-toolchain }} bench --no-run
 
