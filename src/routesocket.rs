@@ -10,7 +10,7 @@ use std::{
     os::fd::{AsRawFd, FromRawFd, OwnedFd},
 };
 
-use libc::{read, socket, write, SOCK_RAW};
+use libc::{fsync, read, socket, write, SOCK_RAW};
 
 use crate::unlikely_err;
 
@@ -49,7 +49,8 @@ impl Write for RouteSocket {
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
+        let res = unsafe { fsync(self.as_raw_fd()) };
+        check_result(res as isize).and(Ok(()))
     }
 }
 

@@ -147,7 +147,9 @@ impl IfIndexMsg {
     }
 
     const fn len(&self) -> usize {
-        self.nlmsg.nlmsg_len as usize
+        let len = self.nlmsg.nlmsg_len as usize;
+        debug_assert!(len <= size_of::<Self>());
+        len
     }
 
     const fn seq(&self) -> u32 {
@@ -157,17 +159,18 @@ impl IfIndexMsg {
 
 impl From<&IfIndexMsg> for &[u8] {
     fn from(value: &IfIndexMsg) -> Self {
-        debug_assert!(value.len() >= size_of::<Self>());
         unsafe { slice::from_raw_parts(ptr::from_ref(value).cast(), value.len()) }
     }
 }
 
-// FIXME: Is there a way to avoid all of these similar `From` functions for each type?
+impl TryFrom<&[u8]> for nlmsghdr {
+    type Error = Error;
 
-impl From<&[u8]> for nlmsghdr {
-    fn from(value: &[u8]) -> Self {
-        debug_assert!(value.len() >= size_of::<Self>());
-        unsafe { ptr::read_unaligned(value.as_ptr().cast()) }
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        if value.len() < size_of::<Self>() {
+            return Err(default_err());
+        }
+        Ok(unsafe { ptr::read_unaligned(value.as_ptr().cast()) })
     }
 }
 
@@ -185,14 +188,14 @@ fn read_msg_with_seq(
     fd: &mut RouteSocket,
     seq: u32,
     kind: u16,
-    buf: &mut Vec<u8>,
-) -> Result<nlmsghdr, Error> {
+) -> Result<(nlmsghdr, Vec<u8>), Error> {
     loop {
+        let buf = &mut [0u8; NETLINK_BUFFER_SIZE];
         let len = fd.read(buf.as_mut_slice())?;
         let mut next = buf.as_slice().split_at(len).0;
         while size_of::<nlmsghdr>() <= next.len() {
             let (hdr, mut msg) = next.split_at(size_of::<nlmsghdr>());
-            let hdr: nlmsghdr = hdr.into();
+            let hdr: nlmsghdr = hdr.try_into()?;
             // `msg` has the remainder of this message plus any following messages.
             // Strip those it off and assign them to `next`.
             debug_assert!(size_of::<nlmsghdr>() <= hdr.nlmsg_len as usize);
@@ -210,17 +213,20 @@ fn read_msg_with_seq(
                 }
             } else if hdr.nlmsg_type == kind {
                 // Return the header and the message.
-                *buf = msg.to_vec();
-                return Ok(hdr);
+                return Ok((hdr, msg.to_vec()));
             }
         }
     }
 }
 
-impl From<&[u8]> for rtattr {
-    fn from(value: &[u8]) -> Self {
-        debug_assert!(value.len() >= size_of::<Self>());
-        unsafe { ptr::read_unaligned(value.as_ptr().cast()) }
+impl TryFrom<&[u8]> for rtattr {
+    type Error = Error;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        if value.len() < size_of::<Self>() {
+            return Err(default_err());
+        }
+        Ok(unsafe { ptr::read_unaligned(value.as_ptr().cast()) })
     }
 }
 
@@ -230,14 +236,14 @@ struct RtAttr<'a> {
 }
 
 impl<'a> RtAttr<'a> {
-    fn new(bytes: &'a [u8]) -> Self {
+    fn new(bytes: &'a [u8]) -> Result<Self, Error> {
         debug_assert!(bytes.len() >= size_of::<rtattr>());
         let (hdr, mut msg) = bytes.split_at(size_of::<rtattr>());
-        let hdr: rtattr = hdr.into();
+        let hdr: rtattr = hdr.try_into()?;
         let aligned_len = aligned_by(hdr.rta_len.into(), 4);
         debug_assert!(size_of::<rtattr>() <= aligned_len);
         (msg, _) = msg.split_at(aligned_len - size_of::<rtattr>());
-        Self { hdr, msg }
+        Ok(Self { hdr, msg })
     }
 }
 
@@ -248,7 +254,7 @@ impl<'a> Iterator for RtAttrs<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if size_of::<rtattr>() <= self.0.len() {
-            let attr = RtAttr::new(self.0);
+            let attr = RtAttr::new(self.0).ok()?;
             let aligned_len = aligned_by(attr.hdr.rta_len.into(), 4);
             debug_assert!(self.0.len() >= aligned_len);
             self.0 = self.0.split_at(aligned_len).1;
@@ -266,8 +272,7 @@ fn if_index(remote: IpAddr, fd: &mut RouteSocket) -> Result<i32, Error> {
     fd.write_all(msg.into())?;
 
     // Receive RTM_GETROUTE response.
-    let mut buf = vec![0u8; NETLINK_BUFFER_SIZE];
-    read_msg_with_seq(fd, msg_seq, RTM_NEWROUTE, &mut buf)?;
+    let (_hdr, mut buf) = read_msg_with_seq(fd, msg_seq, RTM_NEWROUTE)?;
     debug_assert!(size_of::<rtmsg>() <= buf.len());
     let buf = buf.split_off(size_of::<rtmsg>());
 
@@ -332,8 +337,7 @@ fn if_name_mtu(if_index: i32, fd: &mut RouteSocket) -> Result<(String, usize), E
     fd.write_all(msg.into())?;
 
     // Receive RTM_GETLINK response.
-    let mut buf = vec![0u8; NETLINK_BUFFER_SIZE];
-    read_msg_with_seq(fd, msg_seq, RTM_NEWLINK, &mut buf)?;
+    let (_hdr, mut buf) = read_msg_with_seq(fd, msg_seq, RTM_NEWLINK)?;
     debug_assert!(size_of::<ifinfomsg>() <= buf.len());
     let buf = buf.split_off(size_of::<ifinfomsg>());
 
