@@ -318,8 +318,6 @@ jobs:
         with:
           usesh: true
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE GITHUB_ACTIONS"
-          # prepare: |
-          #   pkg install curl
           run: |
             sh rustup.sh --default-toolchain stable --component llvm-tools -y
             . "$HOME/.cargo/env"
