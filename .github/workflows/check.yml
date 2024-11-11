@@ -143,7 +143,7 @@ jobs:
               echo "leak:fetchInitializingClassList"
             } > suppressions.txt
             PWD=$(pwd)
-            export LSAN_OPTIONS="suppressions=$PWD/suppressions.txt"
+            export LSAN_OPTIONS="suppressions=$(pwd)/suppressions.txt"
           fi
           for sanitizer in $SANITIZERS; do
             echo "Running tests with $sanitizer sanitizer..."
