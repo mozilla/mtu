@@ -142,7 +142,6 @@ jobs:
               echo "leak:dyld4::RuntimeState"
               echo "leak:fetchInitializingClassList"
             } > suppressions.txt
-            PWD=$(pwd)
             export LSAN_OPTIONS="suppressions=$(pwd)/suppressions.txt"
           fi
           for sanitizer in $SANITIZERS; do
