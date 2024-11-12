@@ -145,15 +145,12 @@ impl Iterator for IfAddrPtr<'_> {
     type Item = Self;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // std::ptr::NonNull::new(self.0).map(|p| unsafe { p.as_ref() })
-        if self.ptr.is_null() {
-            return None;
-        }
-        let ifa = self.ptr;
-        self.ptr = unsafe { (*ifa).ifa_next };
-        Some(IfAddrPtr {
-            ptr: ifa,
-            _ref: PhantomData,
+        ptr::NonNull::new(self.ptr).map(|p| {
+            self.ptr = unsafe { p.as_ref().ifa_next };
+            IfAddrPtr {
+                ptr: p.as_ptr(),
+                _ref: PhantomData,
+            }
         })
     }
 }

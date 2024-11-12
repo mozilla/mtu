@@ -176,12 +176,9 @@ impl TryFrom<&[u8]> for nlmsghdr {
 }
 
 fn parse_c_int(buf: &[u8]) -> Result<c_int, Error> {
-    if buf.len() < size_of::<c_int>() {
-        return Err(default_err());
-    }
-    let bytes = &buf[..size_of::<c_int>()];
-    let i = c_int::from_ne_bytes(bytes.try_into().map_err(|_| default_err())?);
-    Ok(i)
+    let bytes = <&[u8] as TryInto<[u8; size_of::<c_int>()]>>::try_into(&buf[..size_of::<c_int>()])
+        .map_err(|_| default_err())?;
+    Ok(c_int::from_ne_bytes(bytes))
 }
 
 fn read_msg_with_seq(
