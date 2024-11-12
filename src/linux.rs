@@ -192,7 +192,7 @@ fn read_msg_with_seq(
     loop {
         let buf = &mut [0u8; NETLINK_BUFFER_SIZE];
         let len = fd.read(buf.as_mut_slice())?;
-        let mut next = buf.as_slice().split_at(len).0;
+        let mut next = &buf[..len];
         while size_of::<nlmsghdr>() <= next.len() {
             let (hdr, mut msg) = next.split_at(size_of::<nlmsghdr>());
             let hdr: nlmsghdr = hdr.try_into()?;
