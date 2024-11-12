@@ -7,8 +7,10 @@
 use std::{
     ffi::CStr,
     io::{Error, ErrorKind, Read, Write},
+    marker::PhantomData,
     mem::size_of,
     net::IpAddr,
+    ops::Deref,
     os::fd::AsRawFd,
     ptr, slice,
     str::Utf8Error,
@@ -21,8 +23,6 @@ use libc::{
 };
 use static_assertions::{const_assert, const_assert_eq};
 
-use crate::{bsd::bindings::rt_msghdr, routesocket::RouteSocket};
-
 #[allow(
     non_camel_case_types,
     clippy::struct_field_names,
@@ -31,6 +31,8 @@ use crate::{bsd::bindings::rt_msghdr, routesocket::RouteSocket};
 mod bindings {
     include!(env!("BINDINGS"));
 }
+
+use crate::{bsd::bindings::rt_msghdr, routesocket::RouteSocket};
 
 #[cfg(any(apple, target_os = "freebsd", target_os = "openbsd"))]
 const RTM_ADDRS: i32 = libc::RTA_DST;
@@ -92,7 +94,10 @@ impl IfAddrs {
     }
 
     const fn iter(&self) -> IfAddrPtr {
-        IfAddrPtr(self.0)
+        IfAddrPtr {
+            ptr: self.0,
+            _ref: PhantomData,
+        }
     }
 }
 
@@ -105,37 +110,51 @@ impl Drop for IfAddrs {
     }
 }
 
-struct IfAddrPtr(*mut ifaddrs);
+struct IfAddrPtr<'a> {
+    ptr: *mut ifaddrs,
+    _ref: PhantomData<&'a ifaddrs>,
+}
 
-impl IfAddrPtr {
+impl IfAddrPtr<'_> {
     fn addr(&self) -> libc::sockaddr {
-        unsafe { *(*self.0).ifa_addr }
+        unsafe { *self.ifa_addr }
     }
 
     fn name(&self) -> Result<&str, Utf8Error> {
-        unsafe { CStr::from_ptr((*self.0).ifa_name).to_str() }
+        unsafe { CStr::from_ptr(self.ifa_name).to_str() }
     }
 
     fn data(&self) -> Option<if_data> {
-        let ifa_data = unsafe { (*self.0).ifa_data };
-        if ifa_data.is_null() {
+        if self.ifa_data.is_null() {
             None
         } else {
-            Some(unsafe { *(ifa_data as *const if_data) })
+            Some(unsafe { *(self.ifa_data as *const if_data) })
         }
     }
 }
 
-impl Iterator for IfAddrPtr {
+impl Deref for IfAddrPtr<'_> {
+    type Target = ifaddrs;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { self.ptr.as_ref().unwrap() }
+    }
+}
+
+impl Iterator for IfAddrPtr<'_> {
     type Item = Self;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.0.is_null() {
+        // std::ptr::NonNull::new(self.0).map(|p| unsafe { p.as_ref() })
+        if self.ptr.is_null() {
             return None;
         }
-        let ifa = self.0;
-        self.0 = unsafe { (*ifa).ifa_next };
-        Some(Self(ifa))
+        let ifa = self.ptr;
+        self.ptr = unsafe { (*ifa).ifa_next };
+        Some(IfAddrPtr {
+            ptr: ifa,
+            _ref: PhantomData,
+        })
     }
 }
 

@@ -48,12 +48,6 @@ use std::{
 };
 
 #[cfg(any(apple, bsd))]
-use bsd::interface_and_mtu_impl;
-#[cfg(target_os = "linux")]
-use linux::interface_and_mtu_impl;
-#[cfg(target_os = "windows")]
-use windows::interface_and_mtu_impl;
-#[cfg(any(apple, bsd))]
 mod bsd;
 
 #[cfg(target_os = "linux")]
@@ -64,6 +58,13 @@ mod windows;
 
 #[cfg(not(target_os = "windows"))]
 mod routesocket;
+
+#[cfg(any(apple, bsd))]
+use bsd::interface_and_mtu_impl;
+#[cfg(target_os = "linux")]
+use linux::interface_and_mtu_impl;
+#[cfg(target_os = "windows")]
+use windows::interface_and_mtu_impl;
 
 /// Prepare a default error.
 fn default_err() -> Error {

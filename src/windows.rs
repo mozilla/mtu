@@ -11,12 +11,6 @@ use std::{
     ptr, slice,
 };
 
-use bindings::{
-    if_indextoname, FreeMibTable, GetBestInterfaceEx, GetIpInterfaceTable, AF_INET, AF_INET6,
-    AF_UNSPEC, IF_MAX_STRING_SIZE, IN6_ADDR, IN6_ADDR_0, IN_ADDR, IN_ADDR_0, MIB_IPINTERFACE_ROW,
-    MIB_IPINTERFACE_TABLE, NO_ERROR, SOCKADDR, SOCKADDR_IN, SOCKADDR_IN6, SOCKADDR_INET,
-};
-
 use crate::default_err;
 
 #[allow(
@@ -30,6 +24,12 @@ use crate::default_err;
 mod bindings {
     include!(env!("BINDINGS"));
 }
+
+use bindings::{
+    if_indextoname, FreeMibTable, GetBestInterfaceEx, GetIpInterfaceTable, AF_INET, AF_INET6,
+    AF_UNSPEC, IF_MAX_STRING_SIZE, IN6_ADDR, IN6_ADDR_0, IN_ADDR, IN_ADDR_0, MIB_IPINTERFACE_ROW,
+    MIB_IPINTERFACE_TABLE, NO_ERROR, SOCKADDR, SOCKADDR_IN, SOCKADDR_IN6, SOCKADDR_INET,
+};
 
 struct MibTablePtr(*mut MIB_IPINTERFACE_TABLE);
 

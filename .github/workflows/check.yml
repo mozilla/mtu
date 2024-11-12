@@ -142,7 +142,8 @@ jobs:
               echo "leak:dyld4::RuntimeState"
               echo "leak:fetchInitializingClassList"
             } > suppressions.txt
-            export LSAN_OPTIONS="suppressions=$(pwd)/suppressions.txt"
+            PWD=$(pwd)
+            export LSAN_OPTIONS="suppressions=$PWD/suppressions.txt"
           fi
           for sanitizer in $SANITIZERS; do
             echo "Running tests with $sanitizer sanitizer..."
@@ -309,7 +310,8 @@ jobs:
             cargo check --all-targets
             cargo clippy
             cargo test --no-fail-fast
-            # FIXME: error[E0463]: can't find crate for `profiler_builtins`
+            # FIXME: error[E0463]: can't find crate for `profiler_builtins`,
+            # so don't fail the workflow when that happens.
             cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info || true
             cargo test --no-fail-fast --release
 

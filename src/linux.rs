@@ -13,7 +13,6 @@ use std::{
     ptr, slice,
 };
 
-use bindings::{ifinfomsg, nlmsghdr, rtattr, rtmsg};
 use libc::{
     c_int, AF_INET, AF_INET6, AF_NETLINK, AF_UNSPEC, ARPHRD_NONE, IFLA_IFNAME, IFLA_MTU,
     NETLINK_ROUTE, NLMSG_ERROR, NLM_F_ACK, NLM_F_REQUEST, RTA_DST, RTA_OIF, RTM_GETLINK,
@@ -31,6 +30,8 @@ use crate::{aligned_by, default_err, routesocket::RouteSocket, unlikely_err};
 mod bindings {
     include!(env!("BINDINGS"));
 }
+
+use bindings::{ifinfomsg, nlmsghdr, rtattr, rtmsg};
 
 #[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
 const AF_INET_U8: u8 = AF_INET as u8;
@@ -175,11 +176,10 @@ impl TryFrom<&[u8]> for nlmsghdr {
 }
 
 fn parse_c_int(buf: &[u8]) -> Result<c_int, Error> {
-    // TODO: Use `split_at_checked` when our MSRV is >= 1.80.
     if buf.len() < size_of::<c_int>() {
         return Err(default_err());
     }
-    let (bytes, _) = buf.split_at(size_of::<c_int>());
+    let bytes = &buf[..size_of::<c_int>()];
     let i = c_int::from_ne_bytes(bytes.try_into().map_err(|_| default_err())?);
     Ok(i)
 }
