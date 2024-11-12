@@ -289,7 +289,7 @@ fn if_index(remote: IpAddr) -> Result<u16, Error> {
         // There will never be `RTAX_MAX` sockaddrs attached, but it's a safe upper bound.
          (RTAX_MAX as usize * size_of::<sockaddr_storage>())
         ];
-        let len = fd.read(buf.as_mut_slice())?;
+        let len = fd.read(&mut buf[..])?;
         if len < size_of::<rt_msghdr>() {
             return Err(default_err());
         }
