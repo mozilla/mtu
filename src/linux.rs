@@ -6,7 +6,7 @@
 
 use std::{
     ffi::CStr,
-    io::{Error, ErrorKind, Read, Write},
+    io::{Error, ErrorKind, Read, Result, Write},
     mem::size_of,
     net::IpAddr,
     num::TryFromIntError,
@@ -167,7 +167,7 @@ impl From<&IfIndexMsg> for &[u8] {
 impl TryFrom<&[u8]> for nlmsghdr {
     type Error = Error;
 
-    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+    fn try_from(value: &[u8]) -> Result<Self> {
         if value.len() < size_of::<Self>() {
             return Err(default_err());
         }
@@ -175,17 +175,13 @@ impl TryFrom<&[u8]> for nlmsghdr {
     }
 }
 
-fn parse_c_int(buf: &[u8]) -> Result<c_int, Error> {
+fn parse_c_int(buf: &[u8]) -> Result<c_int> {
     let bytes = <&[u8] as TryInto<[u8; size_of::<c_int>()]>>::try_into(&buf[..size_of::<c_int>()])
         .map_err(|_| default_err())?;
     Ok(c_int::from_ne_bytes(bytes))
 }
 
-fn read_msg_with_seq(
-    fd: &mut RouteSocket,
-    seq: u32,
-    kind: u16,
-) -> Result<(nlmsghdr, Vec<u8>), Error> {
+fn read_msg_with_seq(fd: &mut RouteSocket, seq: u32, kind: u16) -> Result<(nlmsghdr, Vec<u8>)> {
     loop {
         let buf = &mut [0u8; NETLINK_BUFFER_SIZE];
         let len = fd.read(buf.as_mut_slice())?;
@@ -219,7 +215,7 @@ fn read_msg_with_seq(
 impl TryFrom<&[u8]> for rtattr {
     type Error = Error;
 
-    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+    fn try_from(value: &[u8]) -> Result<Self> {
         if value.len() < size_of::<Self>() {
             return Err(default_err());
         }
@@ -233,7 +229,7 @@ struct RtAttr<'a> {
 }
 
 impl<'a> RtAttr<'a> {
-    fn new(bytes: &'a [u8]) -> Result<Self, Error> {
+    fn new(bytes: &'a [u8]) -> Result<Self> {
         debug_assert!(bytes.len() >= size_of::<rtattr>());
         let (hdr, mut msg) = bytes.split_at(size_of::<rtattr>());
         let hdr: rtattr = hdr.try_into()?;
@@ -262,7 +258,7 @@ impl<'a> Iterator for RtAttrs<'a> {
     }
 }
 
-fn if_index(remote: IpAddr, fd: &mut RouteSocket) -> Result<i32, Error> {
+fn if_index(remote: IpAddr, fd: &mut RouteSocket) -> Result<i32> {
     // Send RTM_GETROUTE message to get the interface index associated with the destination.
     let msg = &IfIndexMsg::new(remote, 1);
     let msg_seq = msg.seq();
@@ -327,7 +323,7 @@ impl From<&IfInfoMsg> for &[u8] {
     }
 }
 
-fn if_name_mtu(if_index: i32, fd: &mut RouteSocket) -> Result<(String, usize), Error> {
+fn if_name_mtu(if_index: i32, fd: &mut RouteSocket) -> Result<(String, usize)> {
     // Send RTM_GETLINK message to get interface information for the given interface index.
     let msg = &IfInfoMsg::new(if_index, 2);
     let msg_seq = msg.seq();
@@ -369,7 +365,7 @@ fn if_name_mtu(if_index: i32, fd: &mut RouteSocket) -> Result<(String, usize), E
     Err(default_err())
 }
 
-pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> {
+pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize)> {
     // Create a netlink socket.
     let mut fd = RouteSocket::new(AF_NETLINK, NETLINK_ROUTE)?;
     let if_index = if_index(remote, &mut fd)?;

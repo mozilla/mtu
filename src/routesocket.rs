@@ -5,7 +5,7 @@
 // except according to those terms.
 
 use std::{
-    io::{Error, Read, Write},
+    io::{Error, Read, Result, Write},
     num::TryFromIntError,
     os::fd::{AsRawFd, FromRawFd, OwnedFd},
 };
@@ -17,7 +17,7 @@ use crate::unlikely_err;
 pub struct RouteSocket(OwnedFd);
 
 impl RouteSocket {
-    pub fn new(domain: libc::c_int, protocol: libc::c_int) -> Result<Self, Error> {
+    pub fn new(domain: libc::c_int, protocol: libc::c_int) -> Result<Self> {
         let fd = unsafe { socket(domain, SOCK_RAW, protocol) };
         if fd == -1 {
             return Err(Error::last_os_error());
@@ -32,7 +32,7 @@ impl AsRawFd for RouteSocket {
     }
 }
 
-fn check_result(res: isize) -> Result<usize, Error> {
+fn check_result(res: isize) -> Result<usize> {
     if res == -1 {
         Err(Error::last_os_error())
     } else {

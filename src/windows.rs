@@ -6,7 +6,7 @@
 
 use std::{
     ffi::{c_void, CStr},
-    io::{Error, ErrorKind},
+    io::{Error, ErrorKind, Result},
     net::IpAddr,
     ptr, slice,
 };
@@ -48,7 +48,7 @@ impl Drop for MibTablePtr {
     }
 }
 
-pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> {
+pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize)> {
     // Convert remote to Windows SOCKADDR_INET format. The SOCKADDR_INET union contains an IPv4 or
     // an IPv6 address.
     //

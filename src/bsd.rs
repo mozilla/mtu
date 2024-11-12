@@ -6,14 +6,13 @@
 
 use std::{
     ffi::CStr,
-    io::{Error, ErrorKind, Read, Write},
+    io::{Error, ErrorKind, Read, Result, Write},
     marker::PhantomData,
     mem::size_of,
     net::IpAddr,
     ops::Deref,
     os::fd::AsRawFd,
     ptr, slice,
-    str::Utf8Error,
 };
 
 use libc::{
@@ -83,7 +82,7 @@ impl Default for IfAddrs {
 }
 
 impl IfAddrs {
-    fn new() -> Result<Self, Error> {
+    fn new() -> Result<Self> {
         let mut ifap = Self::default();
         // getifaddrs allocates memory for the linked list of interfaces that is freed by
         // `IfAddrs::drop`.
@@ -120,8 +119,8 @@ impl IfAddrPtr<'_> {
         unsafe { *self.ifa_addr }
     }
 
-    fn name(&self) -> Result<&str, Utf8Error> {
-        unsafe { CStr::from_ptr(self.ifa_name).to_str() }
+    fn name(&self) -> String {
+        unsafe { CStr::from_ptr(self.ifa_name).to_string_lossy().to_string() }
     }
 
     fn data(&self) -> Option<if_data> {
@@ -155,7 +154,7 @@ impl Iterator for IfAddrPtr<'_> {
     }
 }
 
-fn if_name_mtu(idx: u32) -> Result<(String, usize), Error> {
+fn if_name_mtu(idx: u32) -> Result<(String, usize)> {
     let mut name = [0; libc::IF_NAMESIZE];
     // if_indextoname writes into the provided buffer.
     if unsafe { if_indextoname(idx, name.as_mut_ptr()).is_null() } {
@@ -169,10 +168,7 @@ fn if_name_mtu(idx: u32) -> Result<(String, usize), Error> {
     };
 
     for ifa in IfAddrs::new()?.iter() {
-        let ifa_name = ifa
-            .name()
-            .map_err(|err| Error::new(ErrorKind::Other, err))?;
-        if ifa.addr().sa_family == AF_LINK_U8 && ifa_name == name {
+        if ifa.addr().sa_family == AF_LINK_U8 && ifa.name() == name {
             if let Some(ifa_data) = ifa.data() {
                 if let Ok(mtu) = usize::try_from(ifa_data.ifi_mtu) {
                     return Ok((name.to_string(), mtu));
@@ -285,7 +281,7 @@ impl From<Vec<u8>> for rt_msghdr {
     }
 }
 
-fn if_index(remote: IpAddr) -> Result<u16, Error> {
+fn if_index(remote: IpAddr) -> Result<u16> {
     // Open route socket.
     let mut fd = RouteSocket::new(PF_ROUTE, AF_UNSPEC)?;
 
@@ -323,7 +319,7 @@ fn if_index(remote: IpAddr) -> Result<u16, Error> {
     }
 }
 
-pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize), Error> {
+pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize)> {
     let if_index = if_index(remote)?;
     if_name_mtu(if_index.into())
 }

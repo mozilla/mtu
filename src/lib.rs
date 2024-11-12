@@ -43,7 +43,7 @@
 //! guidelines](CODE_OF_CONDUCT.md) beforehand.
 
 use std::{
-    io::{Error, ErrorKind},
+    io::{Error, ErrorKind, Result},
     net::IpAddr,
 };
 
@@ -99,7 +99,7 @@ const fn aligned_by(size: usize, align: usize) -> usize {
 /// # Errors
 ///
 /// This function returns an error if the local interface MTU cannot be determined.
-pub fn interface_and_mtu(remote: IpAddr) -> Result<(String, usize), Error> {
+pub fn interface_and_mtu(remote: IpAddr) -> Result<(String, usize)> {
     interface_and_mtu_impl(remote)
 }
 
