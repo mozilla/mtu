@@ -306,7 +306,6 @@ jobs:
             export LIBCLANG_PATH=/usr/pkg/lib
             export RUST_LOG=trace
             cargo install cargo-llvm-cov --locked
-            /sbin/ifconfig
             cargo check --all-targets
             cargo clippy
             cargo test --no-fail-fast
