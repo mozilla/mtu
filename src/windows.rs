@@ -116,7 +116,7 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize)> {
     for iface in ifaces {
         if iface.InterfaceIndex == idx {
             // Get the MTU.
-            let mtu: usize = iface.NlMtu.try_into().or(Err(default_err()))?;
+            let mtu: usize = iface.NlMtu.try_into().map_err(|_| default_err())?;
             // Get the interface name.
             let mut interfacename = [0u8; IF_MAX_STRING_SIZE as usize];
             // if_indextoname writes into the provided buffer.
@@ -125,7 +125,7 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize)> {
             }
             // Convert the interface name to a Rust string.
             let name = CStr::from_bytes_until_nul(interfacename.as_ref())
-                .or(Err(default_err()))?
+                .map_err(|_| default_err())?
                 .to_str()
                 .map_err(|err| Error::new(ErrorKind::Other, err))?
                 .to_string();
