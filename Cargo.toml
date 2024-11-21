@@ -12,7 +12,6 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 # Don't increase beyond what Firefox is currently using:
 # https://searchfox.org/mozilla-central/search?q=MINIMUM_RUST_VERSION&path=python/mozboot/mozboot/util.py
-# Also keep in sync with .github/workflows/check.yml
 rust-version = "1.76.0"
 
 [badges]
@@ -23,18 +22,22 @@ maintenance = { status = "actively-developed", branch = "main" }
 
 [dependencies]
 # Don't increase beyond what Firefox is currently using: https://searchfox.org/mozilla-central/source/Cargo.lock
-libc = { version = "0.2", default-features = false }
+libc = { version = ">=0.2.161", default-features = false }
+static_assertions = { version = "1.1", default-features = false }
 
-[dev-dependencies]
-rand = { version = "0.8", default-features = false, features = ["std", "std_rng"] }
-
-[target."cfg(windows)".dependencies]
+[target.'cfg(windows)'.dependencies]
 # Don't increase beyond what Firefox is currently using: https://searchfox.org/mozilla-central/source/Cargo.lock
 windows-core = "0.58"
 windows-targets = "0.52"
 
-[target."cfg(windows)".dev-dependencies]
-windows-bindgen = { version = "0.58" } # MSRV is 1.70
+[build-dependencies]
+cfg_aliases = "0.2"
+
+[target.'cfg(not(windows))'.build-dependencies]
+bindgen = { version = "0.69.5" }
+
+[target.'cfg(windows)'.build-dependencies]
+windows-bindgen = { version = "0.58" }
 
 [lints.clippy]
 cargo = { level = "warn", priority = -1 }
