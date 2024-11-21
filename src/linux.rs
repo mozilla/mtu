@@ -14,9 +14,9 @@ use std::{
 };
 
 use libc::{
-    c_int, AF_INET, AF_INET6, AF_NETLINK, AF_UNSPEC, ARPHRD_NONE, IFLA_IFNAME, IFLA_MTU,
-    NETLINK_ROUTE, NLMSG_ERROR, NLM_F_ACK, NLM_F_REQUEST, RTA_DST, RTA_OIF, RTM_GETLINK,
-    RTM_GETROUTE, RTM_NEWLINK, RTM_NEWROUTE, RTN_UNICAST, RT_SCOPE_UNIVERSE, RT_TABLE_MAIN,
+    c_int, AF_NETLINK, ARPHRD_NONE, IFLA_IFNAME, IFLA_MTU, NETLINK_ROUTE, RTA_DST, RTA_OIF,
+    RTM_GETLINK, RTM_GETROUTE, RTM_NEWLINK, RTM_NEWROUTE, RTN_UNICAST, RT_SCOPE_UNIVERSE,
+    RT_TABLE_MAIN,
 };
 use static_assertions::{const_assert, const_assert_eq};
 
@@ -34,28 +34,28 @@ mod bindings {
 use bindings::{ifinfomsg, nlmsghdr, rtattr, rtmsg};
 
 #[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
-const AF_INET_U8: u8 = AF_INET as u8;
-const_assert_eq!(AF_INET_U8 as i32, AF_INET);
+const AF_INET: u8 = libc::AF_INET as u8;
+const_assert_eq!(AF_INET as i32, libc::AF_INET);
 
 #[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
-const AF_INET6_U8: u8 = AF_INET6 as u8;
-const_assert_eq!(AF_INET6_U8 as i32, AF_INET6);
+const AF_INET6: u8 = libc::AF_INET6 as u8;
+const_assert_eq!(AF_INET6 as i32, libc::AF_INET6);
 
 #[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
-const AF_UNSPEC_U8: u8 = AF_UNSPEC as u8;
-const_assert_eq!(AF_UNSPEC_U8 as i32, AF_UNSPEC);
+const AF_UNSPEC: u8 = libc::AF_UNSPEC as u8;
+const_assert_eq!(AF_UNSPEC as i32, libc::AF_UNSPEC);
 
 #[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
-const NLM_F_REQUEST_U16: u16 = NLM_F_REQUEST as u16;
-const_assert_eq!(NLM_F_REQUEST_U16 as c_int, NLM_F_REQUEST);
+const NLM_F_REQUEST: u16 = libc::NLM_F_REQUEST as u16;
+const_assert_eq!(NLM_F_REQUEST as c_int, libc::NLM_F_REQUEST);
 
 #[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
-const NLM_F_ACK_U16: u16 = NLM_F_ACK as u16;
-const_assert_eq!(NLM_F_ACK_U16 as c_int, NLM_F_ACK);
+const NLM_F_ACK: u16 = libc::NLM_F_ACK as u16;
+const_assert_eq!(NLM_F_ACK as c_int, libc::NLM_F_ACK);
 
 #[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
-const NLMSG_ERROR_U16: u16 = NLMSG_ERROR as u16;
-const_assert_eq!(NLMSG_ERROR_U16 as c_int, NLMSG_ERROR);
+const NLMSG_ERROR: u16 = libc::NLMSG_ERROR as u16;
+const_assert_eq!(NLMSG_ERROR as c_int, libc::NLMSG_ERROR);
 
 const_assert!(size_of::<nlmsghdr>() <= u8::MAX as usize);
 const_assert!(size_of::<rtmsg>() <= u8::MAX as usize);
@@ -119,14 +119,14 @@ impl IfIndexMsg {
             nlmsg: nlmsghdr {
                 nlmsg_len,
                 nlmsg_type: RTM_GETROUTE,
-                nlmsg_flags: NLM_F_REQUEST_U16 | NLM_F_ACK_U16,
+                nlmsg_flags: NLM_F_REQUEST | NLM_F_ACK,
                 nlmsg_seq,
                 ..Default::default()
             },
             rtm: rtmsg {
                 rtm_family: match remote {
-                    IpAddr::V4(_) => AF_INET_U8,
-                    IpAddr::V6(_) => AF_INET6_U8,
+                    IpAddr::V4(_) => AF_INET,
+                    IpAddr::V6(_) => AF_INET6,
                 },
                 rtm_dst_len: match remote {
                     IpAddr::V4(_) => 32,
@@ -152,15 +152,11 @@ impl IfIndexMsg {
         debug_assert!(len <= size_of::<Self>());
         len
     }
-
-    const fn seq(&self) -> u32 {
-        self.nlmsg.nlmsg_seq
-    }
 }
 
-impl From<&IfIndexMsg> for &[u8] {
-    fn from(value: &IfIndexMsg) -> Self {
-        unsafe { slice::from_raw_parts(ptr::from_ref(value).cast(), value.len()) }
+impl From<IfIndexMsg> for &[u8] {
+    fn from(value: IfIndexMsg) -> Self {
+        unsafe { slice::from_raw_parts(ptr::from_ref(&value).cast(), value.len()) }
     }
 }
 
@@ -198,7 +194,7 @@ fn read_msg_with_seq(fd: &mut RouteSocket, seq: u32, kind: u16) -> Result<(nlmsg
                 continue;
             }
 
-            if hdr.nlmsg_type == NLMSG_ERROR_U16 {
+            if hdr.nlmsg_type == NLMSG_ERROR {
                 // Extract the error code and return it.
                 let err = parse_c_int(msg)?;
                 if err != 0 {
@@ -260,8 +256,8 @@ impl<'a> Iterator for RtAttrs<'a> {
 
 fn if_index(remote: IpAddr, fd: &mut RouteSocket) -> Result<i32> {
     // Send RTM_GETROUTE message to get the interface index associated with the destination.
-    let msg = &IfIndexMsg::new(remote, 1);
-    let msg_seq = msg.seq();
+    let msg_seq = RouteSocket::new_seq();
+    let msg = IfIndexMsg::new(remote, msg_seq);
     fd.write_all(msg.into())?;
 
     // Receive RTM_GETROUTE response.
@@ -294,12 +290,12 @@ impl IfInfoMsg {
             nlmsg: nlmsghdr {
                 nlmsg_len,
                 nlmsg_type: RTM_GETLINK,
-                nlmsg_flags: NLM_F_REQUEST_U16 | NLM_F_ACK_U16,
+                nlmsg_flags: NLM_F_REQUEST | NLM_F_ACK,
                 nlmsg_seq,
                 ..Default::default()
             },
             ifim: ifinfomsg {
-                ifi_family: AF_UNSPEC_U8,
+                ifi_family: AF_UNSPEC,
                 ifi_type: ARPHRD_NONE,
                 ifi_index: if_index,
                 ..Default::default()
@@ -310,23 +306,19 @@ impl IfInfoMsg {
     const fn len(&self) -> usize {
         self.nlmsg.nlmsg_len as usize
     }
-
-    const fn seq(&self) -> u32 {
-        self.nlmsg.nlmsg_seq
-    }
 }
 
-impl From<&IfInfoMsg> for &[u8] {
-    fn from(value: &IfInfoMsg) -> Self {
+impl From<IfInfoMsg> for &[u8] {
+    fn from(value: IfInfoMsg) -> Self {
         debug_assert!(value.len() >= size_of::<Self>());
-        unsafe { slice::from_raw_parts(ptr::from_ref(value).cast(), value.len()) }
+        unsafe { slice::from_raw_parts(ptr::from_ref(&value).cast(), value.len()) }
     }
 }
 
 fn if_name_mtu(if_index: i32, fd: &mut RouteSocket) -> Result<(String, usize)> {
     // Send RTM_GETLINK message to get interface information for the given interface index.
-    let msg = &IfInfoMsg::new(if_index, 2);
-    let msg_seq = msg.seq();
+    let msg_seq = RouteSocket::new_seq();
+    let msg = IfInfoMsg::new(if_index, msg_seq);
     fd.write_all(msg.into())?;
 
     // Receive RTM_GETLINK response.

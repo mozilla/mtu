@@ -8,11 +8,24 @@ use std::{
     io::{Error, Read, Result, Write},
     num::TryFromIntError,
     os::fd::{AsRawFd, FromRawFd, OwnedFd},
+    sync::atomic::Ordering,
 };
 
 use libc::{fsync, read, socket, write, SOCK_RAW};
 
 use crate::unlikely_err;
+
+#[cfg(target_os = "linux")]
+type AtomicRouteSocketSeq = std::sync::atomic::AtomicU32;
+#[cfg(target_os = "linux")]
+type RouteSocketSeq = u32;
+
+#[cfg(not(target_os = "linux"))]
+type AtomicRouteSocketSeq = std::sync::atomic::AtomicI32;
+#[cfg(not(target_os = "linux"))]
+type RouteSocketSeq = i32;
+
+static SEQ: AtomicRouteSocketSeq = AtomicRouteSocketSeq::new(0);
 
 pub struct RouteSocket(OwnedFd);
 
@@ -23,6 +36,10 @@ impl RouteSocket {
             return Err(Error::last_os_error());
         }
         Ok(Self(unsafe { OwnedFd::from_raw_fd(fd) }))
+    }
+
+    pub fn new_seq() -> RouteSocketSeq {
+        SEQ.fetch_add(1, Ordering::Relaxed)
     }
 }
 

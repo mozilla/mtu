@@ -11,14 +11,12 @@ use std::{
     mem::size_of,
     net::IpAddr,
     ops::Deref,
-    os::fd::AsRawFd,
     ptr, slice,
 };
 
 use libc::{
     freeifaddrs, getifaddrs, getpid, if_data, if_indextoname, ifaddrs, in6_addr, in_addr,
-    sockaddr_in, sockaddr_in6, sockaddr_storage, AF_INET, AF_INET6, AF_LINK, AF_UNSPEC, PF_ROUTE,
-    RTAX_MAX, RTM_GET, RTM_VERSION,
+    sockaddr_in, sockaddr_in6, sockaddr_storage, AF_UNSPEC, PF_ROUTE, RTAX_MAX,
 };
 use static_assertions::{const_assert, const_assert_eq};
 
@@ -50,24 +48,24 @@ const ALIGN: usize = size_of::<libc::c_long>();
 use crate::{aligned_by, default_err};
 
 #[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
-const AF_INET_U8: u8 = AF_INET as u8;
-const_assert_eq!(AF_INET_U8 as i32, AF_INET);
+const AF_INET: u8 = libc::AF_INET as u8;
+const_assert_eq!(AF_INET as i32, libc::AF_INET);
 
 #[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
-const AF_INET6_U8: u8 = AF_INET6 as u8;
-const_assert_eq!(AF_INET6_U8 as i32, AF_INET6);
+const AF_INET6: u8 = libc::AF_INET6 as u8;
+const_assert_eq!(AF_INET6 as i32, libc::AF_INET6);
 
 #[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
-const AF_LINK_U8: u8 = AF_LINK as u8;
-const_assert_eq!(AF_LINK_U8 as i32, AF_LINK);
+const AF_LINK: u8 = libc::AF_LINK as u8;
+const_assert_eq!(AF_LINK as i32, libc::AF_LINK);
 
 #[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
-const RTM_VERSION_U8: u8 = RTM_VERSION as u8;
-const_assert_eq!(RTM_VERSION_U8 as i32, RTM_VERSION);
+const RTM_VERSION: u8 = libc::RTM_VERSION as u8;
+const_assert_eq!(RTM_VERSION as i32, libc::RTM_VERSION);
 
 #[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
-const RTM_GET_U8: u8 = RTM_GET as u8;
-const_assert_eq!(RTM_GET_U8 as i32, RTM_GET);
+const RTM_GET: u8 = libc::RTM_GET as u8;
+const_assert_eq!(RTM_GET as i32, libc::RTM_GET);
 
 const_assert!(size_of::<sockaddr_in>() + ALIGN <= u8::MAX as usize);
 const_assert!(size_of::<sockaddr_in6>() + ALIGN <= u8::MAX as usize);
@@ -127,7 +125,7 @@ impl IfAddrPtr<'_> {
         if self.ifa_data.is_null() {
             None
         } else {
-            Some(unsafe { *(self.ifa_data as *const if_data) })
+            Some(unsafe { self.ifa_data.cast::<if_data>().read() })
         }
     }
 }
@@ -168,7 +166,7 @@ fn if_name_mtu(idx: u32) -> Result<(String, usize)> {
     };
 
     for ifa in IfAddrs::new()?.iter() {
-        if ifa.addr().sa_family == AF_LINK_U8 && ifa.name() == name {
+        if ifa.addr().sa_family == AF_LINK && ifa.name() == name {
             if let Some(ifa_data) = ifa.data() {
                 if let Ok(mtu) = usize::try_from(ifa_data.ifi_mtu) {
                     return Ok((name.to_string(), mtu));
@@ -200,7 +198,7 @@ impl From<IpAddr> for SockaddrStorage {
                 #[allow(clippy::cast_possible_truncation)]
                 // `sockaddr_in` len is <= u8::MAX per `const_assert!` above.
                 sin_len: size_of::<sockaddr_in>() as u8,
-                sin_family: AF_INET_U8,
+                sin_family: AF_INET,
                 sin_addr: in_addr {
                     s_addr: u32::from_ne_bytes(ip.octets()),
                 },
@@ -213,7 +211,7 @@ impl From<IpAddr> for SockaddrStorage {
                 #[allow(clippy::cast_possible_truncation)]
                 // `sockaddr_in6` len is <= u8::MAX per `const_assert!` above.
                 sin6_len: size_of::<sockaddr_in6>() as u8,
-                sin6_family: AF_INET6_U8,
+                sin6_family: AF_INET6,
                 sin6_addr: in6_addr {
                     s6_addr: ip.octets(),
                 },
@@ -240,8 +238,8 @@ impl RouteMessage {
                 #[allow(clippy::cast_possible_truncation)]
                 // `rt_msghdr` len + `ALIGN` is <= u8::MAX per `const_assert!` above.
                 rtm_msglen: (size_of::<rt_msghdr>() + aligned_by(sa.len().into(), ALIGN)) as u16,
-                rtm_version: RTM_VERSION_U8,
-                rtm_type: RTM_GET_U8,
+                rtm_version: RTM_VERSION,
+                rtm_type: RTM_GET,
                 rtm_seq: seq,
                 rtm_addrs: RTM_ADDRS,
                 ..Default::default()
@@ -254,10 +252,6 @@ impl RouteMessage {
         self.rtm.rtm_version
     }
 
-    const fn seq(&self) -> i32 {
-        self.rtm.rtm_seq
-    }
-
     const fn kind(&self) -> u8 {
         self.rtm.rtm_type
     }
@@ -267,10 +261,10 @@ impl RouteMessage {
     }
 }
 
-impl From<&RouteMessage> for &[u8] {
-    fn from(value: &RouteMessage) -> Self {
+impl From<RouteMessage> for &[u8] {
+    fn from(value: RouteMessage) -> Self {
         debug_assert!(value.len() >= size_of::<Self>());
-        unsafe { slice::from_raw_parts(ptr::from_ref(value).cast(), value.len()) }
+        unsafe { slice::from_raw_parts(ptr::from_ref(&value).cast(), value.len()) }
     }
 }
 
@@ -286,9 +280,9 @@ fn if_index(remote: IpAddr) -> Result<u16> {
     let mut fd = RouteSocket::new(PF_ROUTE, AF_UNSPEC)?;
 
     // Send route message.
-    let query = &RouteMessage::new(remote, fd.as_raw_fd());
+    let query_seq = RouteSocket::new_seq();
+    let query = RouteMessage::new(remote, query_seq);
     let query_version = query.version();
-    let query_seq = query.seq();
     let query_type = query.kind();
     fd.write_all(query.into())?;
 

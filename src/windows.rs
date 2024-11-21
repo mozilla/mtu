@@ -5,7 +5,7 @@
 // except according to those terms.
 
 use std::{
-    ffi::{c_void, CStr},
+    ffi::CStr,
     io::{Error, ErrorKind, Result},
     net::IpAddr,
     ptr, slice,
@@ -33,6 +33,12 @@ use bindings::{
 
 struct MibTablePtr(*mut MIB_IPINTERFACE_TABLE);
 
+impl MibTablePtr {
+    fn mut_ptr_ptr(&mut self) -> *mut *mut MIB_IPINTERFACE_TABLE {
+        ptr::from_mut(&mut self.0)
+    }
+}
+
 impl Default for MibTablePtr {
     fn default() -> Self {
         Self(ptr::null_mut())
@@ -43,7 +49,7 @@ impl Drop for MibTablePtr {
     fn drop(&mut self) {
         if !self.0.is_null() {
             // Free the memory allocated by GetIpInterfaceTable.
-            unsafe { FreeMibTable(self.0 as *const c_void) };
+            unsafe { FreeMibTable(self.0.cast()) };
         }
     }
 }
@@ -101,7 +107,7 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize)> {
     // Get a list of all interfaces with associated metadata.
     let mut if_table = MibTablePtr::default();
     // GetIpInterfaceTable allocates memory, which MibTablePtr::drop will free.
-    if unsafe { GetIpInterfaceTable(AF_UNSPEC, ptr::from_mut(&mut if_table.0)) } != NO_ERROR {
+    if unsafe { GetIpInterfaceTable(AF_UNSPEC, if_table.mut_ptr_ptr()) } != NO_ERROR {
         return Err(Error::last_os_error());
     }
     // Make a slice
