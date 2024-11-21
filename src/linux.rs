@@ -33,29 +33,12 @@ mod bindings {
 
 use bindings::{ifinfomsg, nlmsghdr, rtattr, rtmsg};
 
-#[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
-const AF_INET: u8 = libc::AF_INET as u8;
-const_assert_eq!(AF_INET as i32, libc::AF_INET);
-
-#[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
-const AF_INET6: u8 = libc::AF_INET6 as u8;
-const_assert_eq!(AF_INET6 as i32, libc::AF_INET6);
-
-#[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
-const AF_UNSPEC: u8 = libc::AF_UNSPEC as u8;
-const_assert_eq!(AF_UNSPEC as i32, libc::AF_UNSPEC);
-
-#[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
-const NLM_F_REQUEST: u16 = libc::NLM_F_REQUEST as u16;
-const_assert_eq!(NLM_F_REQUEST as c_int, libc::NLM_F_REQUEST);
-
-#[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
-const NLM_F_ACK: u16 = libc::NLM_F_ACK as u16;
-const_assert_eq!(NLM_F_ACK as c_int, libc::NLM_F_ACK);
-
-#[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
-const NLMSG_ERROR: u16 = libc::NLMSG_ERROR as u16;
-const_assert_eq!(NLMSG_ERROR as c_int, libc::NLMSG_ERROR);
+asserted_const_with_type!(AF_INET, u8, libc::AF_INET, i32);
+asserted_const_with_type!(AF_INET6, u8, libc::AF_INET6, i32);
+asserted_const_with_type!(AF_UNSPEC, u8, libc::AF_UNSPEC, i32);
+asserted_const_with_type!(NLM_F_REQUEST, u16, libc::NLM_F_REQUEST, c_int);
+asserted_const_with_type!(NLM_F_ACK, u16, libc::NLM_F_ACK, c_int);
+asserted_const_with_type!(NLMSG_ERROR, u16, libc::NLMSG_ERROR, c_int);
 
 const_assert!(size_of::<nlmsghdr>() <= u8::MAX as usize);
 const_assert!(size_of::<rtmsg>() <= u8::MAX as usize);

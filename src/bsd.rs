@@ -47,25 +47,11 @@ const ALIGN: usize = size_of::<libc::c_long>();
 
 use crate::{aligned_by, default_err};
 
-#[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
-const AF_INET: u8 = libc::AF_INET as u8;
-const_assert_eq!(AF_INET as i32, libc::AF_INET);
-
-#[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
-const AF_INET6: u8 = libc::AF_INET6 as u8;
-const_assert_eq!(AF_INET6 as i32, libc::AF_INET6);
-
-#[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
-const AF_LINK: u8 = libc::AF_LINK as u8;
-const_assert_eq!(AF_LINK as i32, libc::AF_LINK);
-
-#[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
-const RTM_VERSION: u8 = libc::RTM_VERSION as u8;
-const_assert_eq!(RTM_VERSION as i32, libc::RTM_VERSION);
-
-#[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
-const RTM_GET: u8 = libc::RTM_GET as u8;
-const_assert_eq!(RTM_GET as i32, libc::RTM_GET);
+asserted_const_with_type!(AF_INET, u8, libc::AF_INET, i32);
+asserted_const_with_type!(AF_INET6, u8, libc::AF_INET6, i32);
+asserted_const_with_type!(AF_LINK, u8, libc::AF_LINK, i32);
+asserted_const_with_type!(RTM_VERSION, u8, libc::RTM_VERSION, i32);
+asserted_const_with_type!(RTM_GET, u8, libc::RTM_GET, i32);
 
 const_assert!(size_of::<sockaddr_in>() + ALIGN <= u8::MAX as usize);
 const_assert!(size_of::<sockaddr_in6>() + ALIGN <= u8::MAX as usize);

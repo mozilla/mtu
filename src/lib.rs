@@ -47,6 +47,14 @@ use std::{
     net::IpAddr,
 };
 
+macro_rules! asserted_const_with_type {
+    ($name:ident, $t1:ty, $e:expr, $t2:ty) => {
+        #[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
+        const $name: $t1 = $e as $t1;
+        const_assert_eq!($name as $t2, $e);
+    };
+}
+
 #[cfg(any(apple, bsd))]
 mod bsd;
 
