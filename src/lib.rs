@@ -47,6 +47,7 @@ use std::{
     net::IpAddr,
 };
 
+#[cfg(not(target_os = "windows"))]
 macro_rules! asserted_const_with_type {
     ($name:ident, $t1:ty, $e:expr, $t2:ty) => {
         #[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
