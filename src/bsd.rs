@@ -261,10 +261,10 @@ impl RouteMessage {
     }
 }
 
-impl From<RouteMessage> for &[u8] {
-    fn from(value: RouteMessage) -> Self {
+impl From<&RouteMessage> for &[u8] {
+    fn from(value: &RouteMessage) -> Self {
         debug_assert!(value.len() >= size_of::<Self>());
-        unsafe { slice::from_raw_parts(ptr::from_ref(&value).cast(), value.len()) }
+        unsafe { slice::from_raw_parts(ptr::from_ref(value).cast(), value.len()) }
     }
 }
 
@@ -284,7 +284,7 @@ fn if_index(remote: IpAddr) -> Result<u16> {
     let query = RouteMessage::new(remote, query_seq);
     let query_version = query.version();
     let query_type = query.kind();
-    fd.write_all(query.into())?;
+    fd.write_all((&query).into())?;
 
     // Read route messages.
     let pid = unsafe { getpid() };

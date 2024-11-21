@@ -154,9 +154,9 @@ impl IfIndexMsg {
     }
 }
 
-impl From<IfIndexMsg> for &[u8] {
-    fn from(value: IfIndexMsg) -> Self {
-        unsafe { slice::from_raw_parts(ptr::from_ref(&value).cast(), value.len()) }
+impl From<&IfIndexMsg> for &[u8] {
+    fn from(value: &IfIndexMsg) -> Self {
+        unsafe { slice::from_raw_parts(ptr::from_ref(value).cast(), value.len()) }
     }
 }
 
@@ -258,7 +258,7 @@ fn if_index(remote: IpAddr, fd: &mut RouteSocket) -> Result<i32> {
     // Send RTM_GETROUTE message to get the interface index associated with the destination.
     let msg_seq = RouteSocket::new_seq();
     let msg = IfIndexMsg::new(remote, msg_seq);
-    fd.write_all(msg.into())?;
+    fd.write_all((&msg).into())?;
 
     // Receive RTM_GETROUTE response.
     let (_hdr, mut buf) = read_msg_with_seq(fd, msg_seq, RTM_NEWROUTE)?;
@@ -308,10 +308,10 @@ impl IfInfoMsg {
     }
 }
 
-impl From<IfInfoMsg> for &[u8] {
-    fn from(value: IfInfoMsg) -> Self {
+impl From<&IfInfoMsg> for &[u8] {
+    fn from(value: &IfInfoMsg) -> Self {
         debug_assert!(value.len() >= size_of::<Self>());
-        unsafe { slice::from_raw_parts(ptr::from_ref(&value).cast(), value.len()) }
+        unsafe { slice::from_raw_parts(ptr::from_ref(value).cast(), value.len()) }
     }
 }
 
@@ -319,7 +319,7 @@ fn if_name_mtu(if_index: i32, fd: &mut RouteSocket) -> Result<(String, usize)> {
     // Send RTM_GETLINK message to get interface information for the given interface index.
     let msg_seq = RouteSocket::new_seq();
     let msg = IfInfoMsg::new(if_index, msg_seq);
-    fd.write_all(msg.into())?;
+    fd.write_all((&msg).into())?;
 
     // Receive RTM_GETLINK response.
     let (_hdr, mut buf) = read_msg_with_seq(fd, msg_seq, RTM_NEWLINK)?;
