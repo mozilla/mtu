@@ -50,7 +50,7 @@ use std::{
 #[cfg(not(target_os = "windows"))]
 macro_rules! asserted_const_with_type {
     ($name:ident, $t1:ty, $e:expr, $t2:ty) => {
-        #[allow(clippy::cast_possible_truncation)] // Guarded by the following `const_assert_eq!`.
+        #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)] // Guarded by the following `const_assert_eq!`.
         const $name: $t1 = $e as $t1;
         const_assert_eq!($name as $t2, $e);
     };
@@ -131,15 +131,21 @@ mod test {
     }
 
     #[cfg(any(apple, target_os = "freebsd",))]
-    const LOOPBACK: NameMtu = NameMtu(Some("lo0"), 16_384);
+    const LOOPBACK: &[NameMtu] = &[NameMtu(Some("lo0"), 16_384), NameMtu(Some("lo0"), 16_384)];
     #[cfg(target_os = "linux")]
-    const LOOPBACK: NameMtu = NameMtu(Some("lo"), 65_536);
+    const LOOPBACK: &[NameMtu] = &[NameMtu(Some("lo0"), 65_536), NameMtu(Some("lo0"), 65_536)];
     #[cfg(target_os = "windows")]
-    const LOOPBACK: NameMtu = NameMtu(Some("loopback_0"), 4_294_967_295);
+    const LOOPBACK: &[NameMtu] = &[
+        NameMtu(Some("lo0"), 4_294_967_295),
+        NameMtu(Some("lo0"), 4_294_967_295),
+    ];
     #[cfg(target_os = "openbsd")]
-    const LOOPBACK: NameMtu = NameMtu(Some("lo0"), 32_768);
+    const LOOPBACK: &[NameMtu] = &[NameMtu(Some("lo0"), 32_768), NameMtu(Some("lo0"), 32_768)];
     #[cfg(target_os = "netbsd")]
-    const LOOPBACK: NameMtu = NameMtu(Some("lo0"), 33_624);
+    const LOOPBACK: &[NameMtu] = &[NameMtu(Some("lo0"), 33_624), NameMtu(Some("lo0"), 33_624)];
+    #[cfg(target_os = "solaris")]
+    // Note: Different loopback MTUs for IPv4 and IPv6?!
+    const LOOPBACK: &[NameMtu] = &[NameMtu(Some("lo0"), 8_232), NameMtu(Some("lo0"), 8_252)];
 
     // Non-loopback interface names are unpredictable, so we only check the MTU.
     const INET: NameMtu = NameMtu(None, 1_500);
@@ -148,7 +154,7 @@ mod test {
     fn loopback_v4() {
         assert_eq!(
             interface_and_mtu(IpAddr::V4(Ipv4Addr::LOCALHOST)).unwrap(),
-            LOOPBACK
+            LOOPBACK[0]
         );
     }
 
@@ -156,7 +162,7 @@ mod test {
     fn loopback_v6() {
         assert_eq!(
             interface_and_mtu(IpAddr::V6(Ipv6Addr::LOCALHOST)).unwrap(),
-            LOOPBACK
+            LOOPBACK[1]
         );
     }
 
