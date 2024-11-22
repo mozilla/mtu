@@ -29,6 +29,7 @@
 //! * FreeBSD
 //! * NetBSD
 //! * OpenBSD
+//! * Solaris
 //!
 //! # Notes
 //!
@@ -133,11 +134,11 @@ mod test {
     #[cfg(any(apple, target_os = "freebsd",))]
     const LOOPBACK: &[NameMtu] = &[NameMtu(Some("lo0"), 16_384), NameMtu(Some("lo0"), 16_384)];
     #[cfg(target_os = "linux")]
-    const LOOPBACK: &[NameMtu] = &[NameMtu(Some("lo0"), 65_536), NameMtu(Some("lo0"), 65_536)];
+    const LOOPBACK: &[NameMtu] = &[NameMtu(Some("lo"), 65_536), NameMtu(Some("lo"), 65_536)];
     #[cfg(target_os = "windows")]
     const LOOPBACK: &[NameMtu] = &[
-        NameMtu(Some("lo0"), 4_294_967_295),
-        NameMtu(Some("lo0"), 4_294_967_295),
+        NameMtu(Some("loopback_0"), 4_294_967_295),
+        NameMtu(Some("loopback_0"), 4_294_967_295),
     ];
     #[cfg(target_os = "openbsd")]
     const LOOPBACK: &[NameMtu] = &[NameMtu(Some("lo0"), 32_768), NameMtu(Some("lo0"), 32_768)];

@@ -166,17 +166,19 @@ fn if_name_mtu(idx: u32) -> Result<(String, Option<usize>)> {
             .to_str()
             .map_err(|err| Error::new(ErrorKind::Other, err))?
     };
+    let mut mtu = None;
     for ifa in IfAddrs::new()?.iter() {
         if ifa.addr().sa_family == AF_LINK && ifa.name() == name {
             if let Some(ifa_data) = ifa.data() {
-                if let Ok(mtu) = usize::try_from(ifa_data.ifi_mtu) {
-                    return Ok((name.to_string(), Some(mtu)));
+                if let Ok(ifi_mtu) = usize::try_from(ifa_data.ifi_mtu) {
+                    mtu = Some(ifi_mtu);
+                    break;
                 }
             }
-            return Ok((name.to_string(), None));
+            break;
         }
     }
-    Ok((name.to_string(), None))
+    Ok((name.to_string(), mtu))
 }
 
 #[repr(C)]
