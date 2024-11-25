@@ -112,7 +112,7 @@ jobs:
           fi
           cargo +${{ matrix.rust-toolchain }} bench --no-run
           
-      - uses: codecov/codecov-action@5c47607acb93fed5485fdbf7232e8a31425f672a # v5.0.2
+      - uses: codecov/codecov-action@015f24e6818733317a2da2edd6290ab26238649a # v5.0.7
         with:
           files: lcov.info
           fail_ci_if_error: false
@@ -329,7 +329,7 @@ jobs:
             cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
             cargo test --no-fail-fast --release
 
-      - uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238 # v4.6.0
+      - uses: codecov/codecov-action@015f24e6818733317a2da2edd6290ab26238649a # v5.0.7
         with:
           file: lcov.info
           fail_ci_if_error: false
