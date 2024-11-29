@@ -17,10 +17,8 @@ fn bindgen() {
     let bindings = bindgen::Builder::default()
         .header_contents(
             "route.h",
-            #[cfg(target_os = "freebsd")]
+            #[cfg(any(target_os = "freebsd", target_os = "openbsd"))]
             "#include <sys/types.h>\n#include <sys/socket.h>\n#include <net/route.h>",
-            #[cfg(target_os = "openbsd")]
-            "#include <sys/types.h>\n#include <net/route.h>",
             #[cfg(not(any(target_os = "freebsd", target_os = "openbsd")))]
             "#include <net/route.h>",
         )
