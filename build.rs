@@ -17,7 +17,10 @@ fn bindgen() {
     let bindings = bindgen::Builder::default()
         .header_contents(
             "route.h",
-            "#include <sys/socket.h>\n#include <net/route.h>",
+            #[cfg(target_os = "freebsd")]
+            "#include <sys/types.h>\n#include <sys/socket.h>\n#include <net/route.h>",
+            #[cfg(not(target_os = "freebsd"))]
+            "#include <net/route.h>",
         )
         // Only generate bindings for the following types
         .allowlist_type("rt_msghdr|rt_metrics");
