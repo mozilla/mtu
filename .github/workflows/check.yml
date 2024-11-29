@@ -337,3 +337,19 @@ jobs:
           verbose: true
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  check-cargo-lock:
+    name: Ensure `Cargo.lock` contains all required dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: mozilla/neqo
+          sparse-checkout: |
+            .github/actions/rust
+          path: neqo
+      - uses: ./neqo/.github/actions/rust
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - run: cargo update -w --locked
