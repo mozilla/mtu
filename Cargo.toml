@@ -38,7 +38,7 @@ cfg_aliases = { version = "0.2", default-features = false }
 bindgen = { version = "0.69", default-features = false, features = ["runtime"] }
 
 [target.'cfg(windows)'.build-dependencies]
-windows-bindgen = { version = "0.58" }
+windows-bindgen = { version = "0.58", default-features = false, features = ["metadata"] }
 
 [lints.clippy]
 cargo = { level = "warn", priority = -1 }
