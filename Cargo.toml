@@ -35,7 +35,7 @@ cfg_aliases = { version = "0.2", default-features = false }
 
 [target.'cfg(not(windows))'.build-dependencies]
 # Don't increase beyond what Firefox is currently using: https://searchfox.org/mozilla-central/source/Cargo.lock
-bindgen = { version = "0.69", default-features = false, features = ["runtime"] }
+bindgen = { version = "0.70", default-features = false, features = ["runtime"] }
 
 [target.'cfg(windows)'.build-dependencies]
 windows-bindgen = { version = "0.58", default-features = false, features = ["metadata"] }
