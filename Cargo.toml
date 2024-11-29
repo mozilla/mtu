@@ -7,7 +7,7 @@ homepage = "https://github.com/mozilla/mtu/"
 repository = "https://github.com/mozilla/mtu/"
 authors = ["The Mozilla Necko Team <necko@mozilla.com>"]
 readme = "README.md"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 # Don't increase beyond what Firefox is currently using:
@@ -22,22 +22,23 @@ maintenance = { status = "actively-developed", branch = "main" }
 
 [dependencies]
 # Don't increase beyond what Firefox is currently using: https://searchfox.org/mozilla-central/source/Cargo.lock
-libc = { version = ">=0.2.161", default-features = false }
+libc = { version = "0.2", default-features = false }
 static_assertions = { version = "1.1", default-features = false }
 
 [target.'cfg(windows)'.dependencies]
 # Don't increase beyond what Firefox is currently using: https://searchfox.org/mozilla-central/source/Cargo.lock
-windows-core = "0.58"
-windows-targets = "0.52"
+windows-core = { version = "0.58", default-features = false }
+windows-targets = { version = "0.52", default-features = false }
 
 [build-dependencies]
-cfg_aliases = "0.2"
+cfg_aliases = { version = "0.2", default-features = false }
 
 [target.'cfg(not(windows))'.build-dependencies]
-bindgen = { version = "0.69.5" }
+# Don't increase beyond what Firefox is currently using: https://searchfox.org/mozilla-central/source/Cargo.lock
+bindgen = { version = "0.69", default-features = false, features = ["runtime"] }
 
 [target.'cfg(windows)'.build-dependencies]
-windows-bindgen = { version = "0.58" }
+windows-bindgen = { version = "0.58", default-features = false, features = ["metadata"] }
 
 [lints.clippy]
 cargo = { level = "warn", priority = -1 }
