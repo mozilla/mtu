@@ -4,7 +4,38 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-pub const BINDINGS: &str = "bindings.rs";
+const BINDINGS: &str = "bindings.rs";
+
+#[cfg(feature = "gecko")]
+fn clang_args() -> Vec<String> {
+    use mozbuild::TOPOBJDIR;
+
+    let flags_path = TOPOBJDIR.join("netwerk/socket/neqo/extra-bindgen-flags");
+    println!("cargo:rerun-if-changed={}", flags_path.to_str().unwrap());
+
+    let mut flags: Vec<String> = std::fs::read_to_string(flags_path)
+        .expect("Failed to read extra-bindgen-flags file")
+        .split_whitespace()
+        .map(std::borrow::ToOwned::to_owned)
+        .collect();
+
+    flags.push(String::from("-include"));
+    flags.push(
+        TOPOBJDIR
+            .join("dist")
+            .join("include")
+            .join("mozilla-config.h")
+            .to_str()
+            .unwrap()
+            .to_string(),
+    );
+    flags
+}
+
+#[cfg(not(feature = "gecko"))]
+const fn clang_args() -> Vec<String> {
+    Vec::new()
+}
 
 #[cfg(not(windows))]
 fn bindgen() {
@@ -25,6 +56,7 @@ fn bindgen() {
         // Only generate bindings for the following types
         .allowlist_type("rt_msghdr|rt_metrics");
     let bindings = bindings
+        .clang_args(clang_args())
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))

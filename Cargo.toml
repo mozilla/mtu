@@ -7,7 +7,7 @@ homepage = "https://github.com/mozilla/mtu/"
 repository = "https://github.com/mozilla/mtu/"
 authors = ["The Mozilla Necko Team <necko@mozilla.com>"]
 readme = "README.md"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 # Don't increase beyond what Firefox is currently using:
@@ -32,6 +32,7 @@ windows-targets = { version = "0.52", default-features = false }
 
 [build-dependencies]
 cfg_aliases = { version = "0.2", default-features = false }
+mozbuild = { version = "0.1", default-features = false, optional = true }
 
 [target.'cfg(not(windows))'.build-dependencies]
 # Don't increase beyond what Firefox is currently using: https://searchfox.org/mozilla-central/source/Cargo.lock
@@ -39,6 +40,9 @@ bindgen = { version = "0.69", default-features = false, features = ["runtime"] }
 
 [target.'cfg(windows)'.build-dependencies]
 windows-bindgen = { version = "0.58", default-features = false, features = ["metadata"] }
+
+[features]
+gecko = ["dep:mozbuild"]
 
 [lints.clippy]
 cargo = { level = "warn", priority = -1 }
