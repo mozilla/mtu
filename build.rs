@@ -32,7 +32,7 @@ fn clang_args() -> Vec<String> {
     flags
 }
 
-#[cfg(not(feature = "gecko"))]
+#[cfg(not(any(feature = "gecko", target_os = "windows")))]
 const fn clang_args() -> Vec<String> {
     Vec::new()
 }

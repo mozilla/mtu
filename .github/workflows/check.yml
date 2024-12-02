@@ -228,7 +228,7 @@ jobs:
           tools: cargo-semver-checks
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - run: cargo semver-checks
+      - run: cargo semver-checks --default-features
 
   readme:
     runs-on: ubuntu-latest
