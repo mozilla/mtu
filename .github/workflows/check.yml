@@ -255,6 +255,8 @@ jobs:
       matrix:
         os: [freebsd, openbsd, netbsd, solaris]
     runs-on: ubuntu-latest
+    env:
+      RUST_LOG: trace
 
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -264,13 +266,12 @@ jobs:
         uses: vmactions/freebsd-vm@debf37ca7b7fa40e19c542ef7ba30d6054a706a4
         with:
           usesh: true
-          envs: "CARGO_TERM_COLOR RUST_BACKTRACE GITHUB_ACTIONS"
+          envs: "CARGO_TERM_COLOR RUST_BACKTRACE RUST_LOG GITHUB_ACTIONS"
           prepare: |
             pkg install -y curl llvm
           run: |
             sh rustup.sh --default-toolchain stable --component llvm-tools -y
             . "$HOME/.cargo/env"
-            export RUST_LOG=trace
             cargo install cargo-llvm-cov --locked
             cargo check --all-targets
             cargo clippy
@@ -281,22 +282,22 @@ jobs:
         uses: vmactions/openbsd-vm@0cfe06e734a0ea3a546fca7ebf200b984b94d58a
         with:
           usesh: true
-          envs: "CARGO_TERM_COLOR RUST_BACKTRACE GITHUB_ACTIONS"
+          envs: "CARGO_TERM_COLOR RUST_BACKTRACE RUST_LOG GITHUB_ACTIONS"
           prepare: |
             pkg_add rust llvm-16.0.6p30 # rustup doesn't support OpenBSD at all
           run: |
             export LIBCLANG_PATH=/usr/local/llvm16/lib
-            export RUST_LOG=trace
+            cargo install cargo-llvm-cov --locked
             cargo check --all-targets
             cargo clippy
-            cargo test --no-fail-fast
+            cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
             cargo test --no-fail-fast --release
 
       - if: matrix.os == 'netbsd'
         uses: vmactions/netbsd-vm@7c9086fdb4cc1aa814cda6e305390c2b966551a9
         with:
           usesh: true
-          envs: "CARGO_TERM_COLOR RUST_BACKTRACE GITHUB_ACTIONS"
+          envs: "CARGO_TERM_COLOR RUST_BACKTRACE RUST_LOG GITHUB_ACTIONS"
           prepare: |
             /usr/sbin/pkg_add pkgin
             pkgin -y install curl clang
@@ -304,14 +305,10 @@ jobs:
             sh rustup.sh --default-toolchain stable --component llvm-tools -y
             . "$HOME/.cargo/env"
             export LIBCLANG_PATH=/usr/pkg/lib
-            export RUST_LOG=trace
             cargo install cargo-llvm-cov --locked
             cargo check --all-targets
             cargo clippy
-            cargo test --no-fail-fast
-            # FIXME: error[E0463]: can't find crate for `profiler_builtins`,
-            # so don't fail the workflow when that happens.
-            cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info || true
+            cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
             cargo test --no-fail-fast --release
 
       - if: matrix.os == 'solaris'
@@ -319,19 +316,16 @@ jobs:
         with:
           release: "11.4-gcc"
           usesh: true
-          envs: "CARGO_TERM_COLOR RUST_BACKTRACE GITHUB_ACTIONS"
+          envs: "CARGO_TERM_COLOR RUST_BACKTRACE RUST_LOG GITHUB_ACTIONS"
           prepare: |
             pkg install clang-libs
           run: |
             source <(curl -s https://raw.githubusercontent.com/psumbera/solaris-rust/refs/heads/main/sh.rust-web-install)
             export LIBCLANG_PATH="/usr/lib/amd64"
-            export RUST_LOG=trace
-            # cargo install cargo-llvm-cov --locked
+            cargo install cargo-llvm-cov --locked
             cargo check --all-targets
             cargo clippy
-            # FIXME: error[E0463]: can't find crate for `profiler_builtins`,
-            # cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
-            cargo test --no-fail-fast
+            cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
             cargo test --no-fail-fast --release
 
       - uses: codecov/codecov-action@015f24e6818733317a2da2edd6290ab26238649a # v5.0.7
