@@ -81,7 +81,7 @@ jobs:
       - uses: ./neqo/.github/actions/rust
         with:
           version: ${{ matrix.rust-toolchain }}
-          components: ${{ matrix.rust-toolchain == 'stable' && 'llvm-tools' || '' }} ${{ matrix.rust-toolchain == 'nightly' && 'rust-src' || '' }}
+          components: ${{ matrix.rust-toolchain == 'stable' && 'clippy llvm-tools' || '' }} ${{ matrix.rust-toolchain == 'nightly' && 'rust-src' || '' }}
           tools: ${{ matrix.rust-toolchain == 'stable' && 'cargo-llvm-cov, ' || '' }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -260,7 +260,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - run: curl -o rustup.sh --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs
 
       - if: matrix.os == 'freebsd'
         uses: vmactions/freebsd-vm@debf37ca7b7fa40e19c542ef7ba30d6054a706a4
@@ -270,12 +269,13 @@ jobs:
           prepare: |
             set -e
             pkg install -y curl llvm
-            sh rustup.sh --default-toolchain stable --component llvm-tools -y
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+              sh -s -- --default-toolchain stable --profile minimal --component clippy llvm-tools -y
           run: |
             set -e
             cargo install cargo-llvm-cov --locked
             cargo check --all-targets
-            cargo clippy
+            cargo clippy -- -D warnings
             cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
             cargo test --no-fail-fast --release
 
@@ -288,14 +288,12 @@ jobs:
             set -e
             pkg_add rust llvm-16.0.6p30 # rustup doesn't support OpenBSD at all
           run: |
-            ls -l $HOME
-            cat $HOME/.profile
             set -e
             export LIBCLANG_PATH=/usr/local/llvm16/lib
             cargo install cargo-llvm-cov --locked
             cargo check --all-targets
-            # FIXME: clippy not available on openbsd
-            # cargo clippy
+            # FIXME: clippy not currently available on openbsd
+            # cargo clippy -- -D warnings
             cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
             cargo test --no-fail-fast --release
 
@@ -308,13 +306,14 @@ jobs:
             set -e
             /usr/sbin/pkg_add pkgin
             pkgin -y install curl clang
-            sh rustup.sh --default-toolchain stable --component llvm-tools -y
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+              sh -s -- --default-toolchain stable --profile minimal --component clippy llvm-tools -y
           run: |
             set -e
             export LIBCLANG_PATH=/usr/pkg/lib
             cargo install cargo-llvm-cov --locked
             cargo check --all-targets
-            cargo clippy
+            cargo clippy -- -D warnings
             cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
             cargo test --no-fail-fast --release
 
@@ -327,15 +326,14 @@ jobs:
           prepare: |
             set -e
             pkg install clang-libs
-            source <(curl -s https://raw.githubusercontent.com/psumbera/solaris-rust/refs/heads/main/sh.rust-web-install)
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+              sh -s -- --default-toolchain stable --profile minimal --component clippy llvm-tools -y
           run: |
-            ls -l $HOME
-            cat $HOME/.profile
             set -e
             export LIBCLANG_PATH="/usr/lib/amd64"
             cargo install cargo-llvm-cov --locked
             cargo check --all-targets
-            cargo clippy
+            cargo clippy -- -D warnings
             cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
             cargo test --no-fail-fast --release
 
