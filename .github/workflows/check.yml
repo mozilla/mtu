@@ -268,12 +268,11 @@ jobs:
           usesh: true
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE RUST_LOG GITHUB_ACTIONS"
           prepare: |
-            set -e -x
+            set -e
             pkg install -y curl llvm
-          run: |
-            set -e -x
             sh rustup.sh --default-toolchain stable --component llvm-tools -y
-            . "$HOME/.cargo/env"
+          run: |
+            set -e
             cargo install cargo-llvm-cov --locked
             cargo check --all-targets
             cargo clippy
@@ -286,14 +285,17 @@ jobs:
           usesh: true
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE RUST_LOG GITHUB_ACTIONS"
           prepare: |
-            set -e -x
+            set -e
             pkg_add rust llvm-16.0.6p30 # rustup doesn't support OpenBSD at all
           run: |
-            set -e -x
+            ls -l $HOME
+            cat $HOME/.profile
+            set -e
             export LIBCLANG_PATH=/usr/local/llvm16/lib
             cargo install cargo-llvm-cov --locked
             cargo check --all-targets
-            cargo clippy
+            # FIXME: clippy not available on openbsd
+            # cargo clippy
             cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
             cargo test --no-fail-fast --release
 
@@ -303,13 +305,12 @@ jobs:
           usesh: true
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE RUST_LOG GITHUB_ACTIONS"
           prepare: |
-            set -e -x
+            set -e
             /usr/sbin/pkg_add pkgin
             pkgin -y install curl clang
-          run: |
-            set -e -x
             sh rustup.sh --default-toolchain stable --component llvm-tools -y
-            . "$HOME/.cargo/env"
+          run: |
+            set -e
             export LIBCLANG_PATH=/usr/pkg/lib
             cargo install cargo-llvm-cov --locked
             cargo check --all-targets
@@ -324,11 +325,13 @@ jobs:
           usesh: true
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE RUST_LOG GITHUB_ACTIONS"
           prepare: |
-            set -e -x
+            set -e
             pkg install clang-libs
-          run: |
-            set -e -x
             source <(curl -s https://raw.githubusercontent.com/psumbera/solaris-rust/refs/heads/main/sh.rust-web-install)
+          run: |
+            ls -l $HOME
+            cat $HOME/.profile
+            set -e
             export LIBCLANG_PATH="/usr/lib/amd64"
             cargo install cargo-llvm-cov --locked
             cargo check --all-targets
