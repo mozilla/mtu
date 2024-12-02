@@ -59,7 +59,7 @@ jobs:
           - os: ubuntu-20.04
             rust-toolchain: stable
             type: debug
-          - os: macos-12
+          - os: macos-13
             rust-toolchain: stable
             type: debug
           - os: windows-2019
@@ -268,8 +268,10 @@ jobs:
           usesh: true
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE RUST_LOG GITHUB_ACTIONS"
           prepare: |
+            set -e -x
             pkg install -y curl llvm
           run: |
+            set -e -x
             sh rustup.sh --default-toolchain stable --component llvm-tools -y
             . "$HOME/.cargo/env"
             cargo install cargo-llvm-cov --locked
@@ -284,8 +286,10 @@ jobs:
           usesh: true
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE RUST_LOG GITHUB_ACTIONS"
           prepare: |
+            set -e -x
             pkg_add rust llvm-16.0.6p30 # rustup doesn't support OpenBSD at all
           run: |
+            set -e -x
             export LIBCLANG_PATH=/usr/local/llvm16/lib
             cargo install cargo-llvm-cov --locked
             cargo check --all-targets
@@ -299,9 +303,11 @@ jobs:
           usesh: true
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE RUST_LOG GITHUB_ACTIONS"
           prepare: |
+            set -e -x
             /usr/sbin/pkg_add pkgin
             pkgin -y install curl clang
           run: |
+            set -e -x
             sh rustup.sh --default-toolchain stable --component llvm-tools -y
             . "$HOME/.cargo/env"
             export LIBCLANG_PATH=/usr/pkg/lib
@@ -318,8 +324,10 @@ jobs:
           usesh: true
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE RUST_LOG GITHUB_ACTIONS"
           prepare: |
+            set -e -x
             pkg install clang-libs
           run: |
+            set -e -x
             source <(curl -s https://raw.githubusercontent.com/psumbera/solaris-rust/refs/heads/main/sh.rust-web-install)
             export LIBCLANG_PATH="/usr/lib/amd64"
             cargo install cargo-llvm-cov --locked
