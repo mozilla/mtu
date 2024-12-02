@@ -290,13 +290,12 @@ jobs:
             pkg_add rust rust-clippy llvm-16.0.6p30 # rustup doesn't support OpenBSD at all
           run: | # This executes as user
             set -e
-            find /usr/local/llvm16 -ls
+            export LIBCLANG_PATH=/usr/local/llvm16/lib
             cargo check --all-targets
             cargo clippy -- -D warnings
-            # FIXME: No profiler support in openbsd currently
-            # error[E0463]: can't find crate for `profiler_builtins`
-            # = note: the compiler may have been built without the profiler runtime
-            # export LIBCLANG_PATH=/usr/local/llvm16/lib
+            # FIXME: No profiler support in openbsd currently, error is:
+            # > error[E0463]: can't find crate for `profiler_builtins`
+            # > = note: the compiler may have been built without the profiler runtime
             # export LLVM_COV=/usr/local/llvm16/bin/llvm-cov
             # export LLVM_PROFDATA=/usr/local/llvm16/bin/llvm-profdata
             # cargo install cargo-llvm-cov --locked
@@ -320,9 +319,9 @@ jobs:
             . "$HOME/.cargo/env"
             cargo check --all-targets
             cargo clippy -- -D warnings
-            # FIXME: No profiler support in openbsd currently
-            # error[E0463]: can't find crate for `profiler_builtins`
-            # = note: the compiler may have been built without the profiler runtime
+            # FIXME: No profiler support in netbsd currently, error is:
+            # > error[E0463]: can't find crate for `profiler_builtins`
+            # > = note: the compiler may have been built without the profiler runtime
             # cargo install cargo-llvm-cov --locked
             # cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
             cargo test --no-fail-fast # Remove this once profiler is supported

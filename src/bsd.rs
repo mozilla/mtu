@@ -344,7 +344,8 @@ fn if_index_mtu(remote: IpAddr) -> Result<(u16, Option<usize>)> {
                     // For others, we need to extract it from the sockaddrs.
                     for i in 0..RTAX_MAX {
                         if (reply.rtm_addrs & (1 << i)) != 0 {
-                            let saddr = unsafe { &*ptr::from_ref(sa).cast::<sockaddr>() };
+                            let saddr =
+                                unsafe { ptr::read_unaligned(sa.as_ptr().cast::<sockaddr>()) };
                             if saddr.sa_family == AF_LINK {
                                 let sdl = unsafe {
                                     ptr::read_unaligned(sa.as_ptr().cast::<sockaddr_dl>())
