@@ -16,7 +16,7 @@ fn clang_args() -> Vec<String> {
     let mut flags: Vec<String> = std::fs::read_to_string(flags_path)
         .expect("Failed to read extra-bindgen-flags file")
         .split_whitespace()
-        .map(std::borrow::ToOwned::to_owned)
+        .to_owned()
         .collect();
 
     flags.push(String::from("-include"));
