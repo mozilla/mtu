@@ -274,8 +274,12 @@ jobs:
             ls -la || true
             ls -la $HOME || true
             cat $HOME/.profile || true
-
+            pwd
           run: |
+            pwd
+            ls -la || true
+            ls -la $HOME || true
+            cat $HOME/.profile || true
             set -e
             cargo install cargo-llvm-cov --locked
             cargo check --all-targets
@@ -328,7 +332,7 @@ jobs:
           usesh: true
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE RUST_LOG GITHUB_ACTIONS"
           prepare: |
-            set -e
+            # set -e
             pkg install clang-libs
             source <(curl -s https://raw.githubusercontent.com/psumbera/solaris-rust/refs/heads/main/sh.rust-web-install)
           run: |
