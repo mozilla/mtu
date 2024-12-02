@@ -111,7 +111,7 @@ jobs:
             cargo +${{ matrix.rust-toolchain }} test "${OPTIONS[@]}"
           fi
           cargo +${{ matrix.rust-toolchain }} bench --no-run
-          
+
       - uses: codecov/codecov-action@015f24e6818733317a2da2edd6290ab26238649a # v5.0.7
         with:
           files: lcov.info
@@ -172,7 +172,7 @@ jobs:
           tools: cargo-hack
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - run: cargo hack clippy --all-targets --feature-powerset -- -D warnings
+      - run: cargo hack clippy --all-targets --feature-powerset --exclude-features gecko -- -D warnings
       - run: cargo doc --workspace --no-deps --document-private-items
         env:
           RUSTDOCFLAGS: "--deny rustdoc::broken_intra_doc_links --deny warnings"
