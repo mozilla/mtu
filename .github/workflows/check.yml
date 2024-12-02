@@ -291,13 +291,17 @@ jobs:
           run: | # This executes as user
             set -e
             find /usr/local/llvm16 -ls
-            export LIBCLANG_PATH=/usr/local/llvm16/lib
-            export LLVM_COV=/usr/local/llvm16/bin/llvm-cov
-            export LLVM_PROFDATA=/usr/local/llvm16/bin/llvm-profdata
-            cargo install cargo-llvm-cov --locked
             cargo check --all-targets
             cargo clippy -- -D warnings
-            cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
+            # FIXME: No profiler support in openbsd currently
+            # error[E0463]: can't find crate for `profiler_builtins`
+            # = note: the compiler may have been built without the profiler runtime
+            # export LIBCLANG_PATH=/usr/local/llvm16/lib
+            # export LLVM_COV=/usr/local/llvm16/bin/llvm-cov
+            # export LLVM_PROFDATA=/usr/local/llvm16/bin/llvm-profdata
+            # cargo install cargo-llvm-cov --locked
+            # cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
+            cargo test --no-fail-fast # Remove this once profiler is supported
             cargo test --no-fail-fast --release
 
       - if: matrix.os == 'netbsd'
@@ -314,10 +318,14 @@ jobs:
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
               sh -s -- --default-toolchain stable --profile minimal --component clippy llvm-tools -y
             . "$HOME/.cargo/env"
-            cargo install cargo-llvm-cov --locked
             cargo check --all-targets
             cargo clippy -- -D warnings
-            cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
+            # FIXME: No profiler support in openbsd currently
+            # error[E0463]: can't find crate for `profiler_builtins`
+            # = note: the compiler may have been built without the profiler runtime
+            # cargo install cargo-llvm-cov --locked
+            # cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
+            cargo test --no-fail-fast # Remove this once profiler is supported
             cargo test --no-fail-fast --release
 
       - if: matrix.os == 'solaris'
@@ -329,13 +337,13 @@ jobs:
           prepare: | # This executes as root
             set -e
             pkg install clang-libs
-          run: | # This executes as user
+          run: | # This executes as also as root on Solaris
             set -e
-            source <(curl -s https://raw.githubusercontent.com/psumbera/solaris-rust/refs/heads/main/sh.rust-web-install)
+            source <(curl -s https://raw.githubusercontent.com/psumbera/solaris-rust/refs/heads/main/sh.rust-web-install) || true # This doesn't exit with zero on success
             export LIBCLANG_PATH="/usr/lib/amd64"
-            cargo install cargo-llvm-cov --locked
             cargo check --all-targets
             cargo clippy -- -D warnings
+            cargo install cargo-llvm-cov --locked
             cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
             cargo test --no-fail-fast --release
 
