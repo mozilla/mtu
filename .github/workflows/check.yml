@@ -266,21 +266,13 @@ jobs:
         with:
           usesh: true
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE RUST_LOG GITHUB_ACTIONS"
-          prepare: |
+          prepare: | # This executes as root
             set -e
             pkg install -y curl llvm
+          run: | # This executes as user
+            set -e
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
               sh -s -- --default-toolchain stable --profile minimal --component clippy llvm-tools -y
-            ls -la || true
-            ls -la $HOME || true
-            cat $HOME/.profile || true
-            pwd
-          run: |
-            pwd
-            ls -la || true
-            ls -la $HOME || true
-            cat $HOME/.profile || true
-            set -e
             cargo install cargo-llvm-cov --locked
             cargo check --all-targets
             cargo clippy -- -D warnings
@@ -292,10 +284,10 @@ jobs:
         with:
           usesh: true
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE RUST_LOG GITHUB_ACTIONS"
-          prepare: |
+          prepare: | # This executes as root
             set -e
             pkg_add rust llvm-16.0.6p30 # rustup doesn't support OpenBSD at all
-          run: |
+          run: | # This executes as user
             set -e
             export LIBCLANG_PATH=/usr/local/llvm16/lib
             cargo install cargo-llvm-cov --locked
@@ -310,15 +302,14 @@ jobs:
         with:
           usesh: true
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE RUST_LOG GITHUB_ACTIONS"
-          prepare: |
+          prepare: | # This executes as root
             set -e
             /usr/sbin/pkg_add pkgin
             pkgin -y install curl clang
+          run: | # This executes as user
+            set -e
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
               sh -s -- --default-toolchain stable --profile minimal --component clippy llvm-tools -y
-          run: |
-            set -e
-            export LIBCLANG_PATH=/usr/pkg/lib
             cargo install cargo-llvm-cov --locked
             cargo check --all-targets
             cargo clippy -- -D warnings
@@ -331,11 +322,11 @@ jobs:
           release: "11.4-gcc"
           usesh: true
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE RUST_LOG GITHUB_ACTIONS"
-          prepare: |
+          prepare: | # This executes as root
             # set -e
             pkg install clang-libs
             source <(curl -s https://raw.githubusercontent.com/psumbera/solaris-rust/refs/heads/main/sh.rust-web-install)
-          run: |
+          run: | # This executes as user
             set -e
             export LIBCLANG_PATH="/usr/lib/amd64"
             cargo install cargo-llvm-cov --locked
