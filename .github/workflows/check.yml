@@ -274,9 +274,9 @@ jobs:
             set -e
             sh rustup.sh --default-toolchain stable --profile minimal --component clippy llvm-tools -y
             . "$HOME/.cargo/env"
-            cargo install cargo-llvm-cov --locked
             cargo check --all-targets
             cargo clippy -- -D warnings
+            cargo install cargo-llvm-cov --locked
             cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
             cargo test --no-fail-fast --release
 
