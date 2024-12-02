@@ -182,12 +182,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
 
 [[package]]
+name = "mozbuild"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "903970ae2f248d7275214cf8f387f8ba0c4ea7e3d87a320e85493db60ce28616"
+
+[[package]]
 name = "mtu"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "bindgen",
  "cfg_aliases",
  "libc",
+ "mozbuild",
  "static_assertions",
  "windows-bindgen",
  "windows-core",
