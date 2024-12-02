@@ -271,6 +271,10 @@ jobs:
             pkg install -y curl llvm
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
               sh -s -- --default-toolchain stable --profile minimal --component clippy llvm-tools -y
+            ls -la || true
+            ls -la $HOME || true
+            cat $HOME/.profile || true
+
           run: |
             set -e
             cargo install cargo-llvm-cov --locked
@@ -326,8 +330,7 @@ jobs:
           prepare: |
             set -e
             pkg install clang-libs
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
-              sh -s -- --default-toolchain stable --profile minimal --component clippy llvm-tools -y
+            source <(curl -s https://raw.githubusercontent.com/psumbera/solaris-rust/refs/heads/main/sh.rust-web-install)
           run: |
             set -e
             export LIBCLANG_PATH="/usr/lib/amd64"
