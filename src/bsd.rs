@@ -166,18 +166,11 @@ fn if_name_mtu(idx: u32) -> Result<(String, Option<usize>)> {
             .to_str()
             .map_err(|err| Error::new(ErrorKind::Other, err))?
     };
-    let mut mtu = None;
-    for ifa in IfAddrs::new()?.iter() {
-        if ifa.addr().sa_family == AF_LINK && ifa.name() == name {
-            if let Some(ifa_data) = ifa.data() {
-                if let Ok(ifi_mtu) = usize::try_from(ifa_data.ifi_mtu) {
-                    mtu = Some(ifi_mtu);
-                    break;
-                }
-            }
-            break;
-        }
-    }
+    let mtu = IfAddrs::new()?
+        .iter()
+        .find(|ifa| ifa.addr().sa_family == AF_LINK && ifa.name() == name)
+        .and_then(|ifa| ifa.data())
+        .and_then(|ifa_data| usize::try_from(ifa_data.ifi_mtu).ok());
     Ok((name.to_string(), mtu))
 }
 
@@ -320,46 +313,46 @@ fn if_index_mtu(remote: IpAddr) -> Result<(u16, Option<usize>)> {
         }
         let (reply, mut sa) = buf.split_at(size_of::<rt_msghdr>());
         let reply: rt_msghdr = reply.into();
-        if reply.rtm_version == query_version && reply.rtm_pid == pid && reply.rtm_seq == query_seq
+        if !(reply.rtm_version == query_version
+            && reply.rtm_pid == pid
+            && reply.rtm_seq == query_seq)
         {
-            // This is a reply to our query.
-            return if reply.rtm_type == query_type {
-                // This is the reply we are looking for.
-                // Some BSDs let us get the interface index and MTU directly from the reply.
-                let mtu: Option<usize> = if reply.rtm_rmx.rmx_mtu != 0 {
-                    Some(
-                        reply
-                            .rtm_rmx
-                            .rmx_mtu
-                            .try_into()
-                            .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?,
-                    )
-                } else {
-                    None
-                };
-                if reply.rtm_index != 0 {
-                    // Some BSDs return the interface index directly.
-                    Ok((reply.rtm_index, mtu))
-                } else {
-                    // For others, we need to extract it from the sockaddrs.
-                    for i in 0..RTAX_MAX {
-                        if (reply.rtm_addrs & (1 << i)) != 0 {
-                            let saddr =
-                                unsafe { ptr::read_unaligned(sa.as_ptr().cast::<sockaddr>()) };
-                            if saddr.sa_family == AF_LINK {
-                                let sdl = unsafe {
-                                    ptr::read_unaligned(sa.as_ptr().cast::<sockaddr_dl>())
-                                };
-                                return Ok((sdl.sdl_index, mtu));
-                            }
-                            (_, sa) = sa.split_at(sockaddr_len(saddr.sa_family)?);
-                        }
-                    }
-                    Err(default_err())
-                }
-            } else {
-                Err(default_err())
-            };
+            continue;
+        }
+        if reply.rtm_type != query_type {
+            return Err(default_err());
+        }
+
+        // This is a reply to our query.
+        // This is the reply we are looking for.
+        // Some BSDs let us get the interface index and MTU directly from the reply.
+        let mtu: Option<usize> = if reply.rtm_rmx.rmx_mtu != 0 {
+            Some(
+                reply
+                    .rtm_rmx
+                    .rmx_mtu
+                    .try_into()
+                    .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?,
+            )
+        } else {
+            None
+        };
+        if reply.rtm_index != 0 {
+            // Some BSDs return the interface index directly.
+            return Ok((reply.rtm_index, mtu));
+        }
+        // For others, we need to extract it from the sockaddrs.
+        for i in 0..RTAX_MAX {
+            if (reply.rtm_addrs & (1 << i)) == 0 {
+                continue;
+            }
+            let saddr = unsafe { ptr::read_unaligned(sa.as_ptr().cast::<sockaddr>()) };
+            if saddr.sa_family != AF_LINK {
+                (_, sa) = sa.split_at(sockaddr_len(saddr.sa_family)?);
+                continue;
+            }
+            let sdl = unsafe { ptr::read_unaligned(sa.as_ptr().cast::<sockaddr_dl>()) };
+            return Ok((sdl.sdl_index, mtu));
         }
     }
 }
