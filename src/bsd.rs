@@ -187,7 +187,7 @@ fn sockaddr_len(af: AddressFamily) -> Result<usize> {
         _ => {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
-                "Unsupported address family {:af}",
+                "Unsupported address family {af:?}",
             ))
         }
     };
