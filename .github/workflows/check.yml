@@ -81,7 +81,7 @@ jobs:
       - uses: ./neqo/.github/actions/rust
         with:
           version: ${{ matrix.rust-toolchain }}
-          components: ${{ matrix.rust-toolchain == 'stable' && 'llvm-tools' || '' }} ${{ matrix.rust-toolchain == 'nightly' && 'rust-src' || '' }}
+          components: ${{ matrix.rust-toolchain == 'nightly' && 'llvm-tools' || '' }} ${{ matrix.rust-toolchain == 'nightly' && 'rust-src' || '' }}
           tools: ${{ matrix.rust-toolchain == 'stable' && 'cargo-llvm-cov, ' || '' }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -101,7 +101,7 @@ jobs:
           if [ "$BUILD_TYPE" ]; then
             OPTIONS+=("$BUILD_TYPE")
           fi
-          if [ "${{ matrix.rust-toolchain }}" == "stable" ] && [ "${{ matrix.type }}" == "debug" ] && [ "${{endsWith(matrix.os, '-latest') && 'latest' || '' }}" == "latest" ]; then
+          if [ "${{ matrix.rust-toolchain }}" == "nightly" ] && [ "${{ matrix.type }}" == "debug" ] && [ "${{endsWith(matrix.os, '-latest') && 'latest' || '' }}" == "latest" ]; then
             cargo +${{ matrix.rust-toolchain }} llvm-cov test --mcdc "${OPTIONS[@]}" --lcov --output-path lcov.info
           else
             if [ "${{ startsWith(matrix.os, 'windows') && 'windows' || '' }}" == "windows" ]; then
@@ -268,7 +268,7 @@ jobs:
           prepare: |
             pkg install -y curl llvm
           run: |
-            sh rustup.sh --default-toolchain stable --component llvm-tools -y
+            sh rustup.sh --default-toolchain nightly --component llvm-tools -y
             . "$HOME/.cargo/env"
             export RUST_LOG=trace
             cargo install cargo-llvm-cov --locked
@@ -301,7 +301,7 @@ jobs:
             /usr/sbin/pkg_add pkgin
             pkgin -y install curl clang
           run: |
-            sh rustup.sh --default-toolchain stable --component llvm-tools -y
+            sh rustup.sh --default-toolchain nightly --component llvm-tools -y
             . "$HOME/.cargo/env"
             export LIBCLANG_PATH=/usr/pkg/lib
             export RUST_LOG=trace
@@ -320,7 +320,7 @@ jobs:
           usesh: true
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE GITHUB_ACTIONS"
           run: |
-            sh rustup.sh --default-toolchain stable --component llvm-tools -y
+            sh rustup.sh --default-toolchain nightly --component llvm-tools -y
             . "$HOME/.cargo/env"
             export RUST_LOG=trace
             cargo install cargo-llvm-cov --locked
