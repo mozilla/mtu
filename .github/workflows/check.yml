@@ -120,7 +120,7 @@ jobs:
           verbose: true
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        if: matrix.type == 'debug' && matrix.rust-toolchain == 'stable' && endsWith(matrix.os, '-latest')
+        if: matrix.type == 'debug' && matrix.rust-toolchain == 'nightly' && endsWith(matrix.os, '-latest')
 
       - name: Run tests with sanitizers
         if: (matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest') && matrix.rust-toolchain == 'nightly'
