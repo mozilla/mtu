@@ -59,7 +59,7 @@ jobs:
           - os: ubuntu-20.04
             rust-toolchain: stable
             type: debug
-          - os: macos-12
+          - os: macos-13
             rust-toolchain: stable
             type: debug
           - os: windows-2019
