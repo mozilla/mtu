@@ -102,7 +102,7 @@ jobs:
             OPTIONS+=("$BUILD_TYPE")
           fi
           if [ "${{ matrix.rust-toolchain }}" == "nightly" ] && [ "${{ matrix.type }}" == "debug" ] && [ "${{endsWith(matrix.os, '-latest') && 'latest' || '' }}" == "latest" ]; then
-            cargo +${{ matrix.rust-toolchain }} llvm-cov test --mcdc "${OPTIONS[@]}" --lcov --output-path lcov.info
+            cargo +${{ matrix.rust-toolchain }} llvm-cov test --mcdc --include-ffi "${OPTIONS[@]}" --codecov --output-path codecov.json
           else
             if [ "${{ startsWith(matrix.os, 'windows') && 'windows' || '' }}" == "windows" ]; then
               # The codegen_windows_bindings test only succeeds when run via llvm-cov?!
@@ -274,7 +274,7 @@ jobs:
             cargo install cargo-llvm-cov --locked
             cargo check --all-targets
             cargo clippy
-            cargo llvm-cov test --mcdc --no-fail-fast --lcov --output-path lcov.info
+            cargo llvm-cov test --mcdc --include-ffi --no-fail-fast --codecov --output-path codecov.json
             cargo test --no-fail-fast --release
 
       - if: matrix.os == 'openbsd'
@@ -311,7 +311,7 @@ jobs:
             cargo test --no-fail-fast
             # FIXME: error[E0463]: can't find crate for `profiler_builtins`,
             # so don't fail the workflow when that happens.
-            cargo llvm-cov test --mcdc --no-fail-fast --lcov --output-path lcov.info || true
+            cargo llvm-cov test --mcdc --include-ffi --no-fail-fast --codecov --output-path codecov.json || true
             cargo test --no-fail-fast --release
 
       - if: matrix.os == 'solaris'
@@ -326,12 +326,12 @@ jobs:
             cargo install cargo-llvm-cov --locked
             cargo check --all-targets
             cargo clippy
-            cargo llvm-cov test --mcdc --no-fail-fast --lcov --output-path lcov.info
+            cargo llvm-cov test --mcdc --include-ffi --no-fail-fast --codecov --output-path codecov.json
             cargo test --no-fail-fast --release
 
       - uses: codecov/codecov-action@7f8b4b4bde536c465e797be725718b88c5d95e0e # v5.1.1
         with:
-          files: lcov.info
+          files: codecov.json
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
