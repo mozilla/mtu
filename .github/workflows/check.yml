@@ -81,8 +81,8 @@ jobs:
       - uses: ./neqo/.github/actions/rust
         with:
           version: ${{ matrix.rust-toolchain }}
-          components: ${{ matrix.rust-toolchain == 'stable' && 'llvm-tools' || '' }} ${{ matrix.rust-toolchain == 'nightly' && 'rust-src' || '' }}
-          tools: ${{ matrix.rust-toolchain == 'stable' && 'cargo-llvm-cov, ' || '' }}
+          components: ${{ matrix.rust-toolchain == 'nightly' && 'llvm-tools' || '' }} ${{ matrix.rust-toolchain == 'nightly' && 'rust-src' || '' }}
+          tools: ${{ matrix.rust-toolchain == 'nightly' && 'cargo-llvm-cov, ' || '' }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check
@@ -101,8 +101,8 @@ jobs:
           if [ "$BUILD_TYPE" ]; then
             OPTIONS+=("$BUILD_TYPE")
           fi
-          if [ "${{ matrix.rust-toolchain }}" == "stable" ] && [ "${{ matrix.type }}" == "debug" ] && [ "${{endsWith(matrix.os, '-latest') && 'latest' || '' }}" == "latest" ]; then
-            cargo +${{ matrix.rust-toolchain }} llvm-cov test "${OPTIONS[@]}" --lcov --output-path lcov.info
+          if [ "${{ matrix.rust-toolchain }}" == "nightly" ] && [ "${{ matrix.type }}" == "debug" ] && [ "${{endsWith(matrix.os, '-latest') && 'latest' || '' }}" == "latest" ]; then
+            cargo +${{ matrix.rust-toolchain }} llvm-cov test --mcdc --include-ffi "${OPTIONS[@]}" --codecov --output-path codecov.json
           else
             if [ "${{ startsWith(matrix.os, 'windows') && 'windows' || '' }}" == "windows" ]; then
               # The codegen_windows_bindings test only succeeds when run via llvm-cov?!
@@ -120,7 +120,7 @@ jobs:
           verbose: true
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        if: matrix.type == 'debug' && matrix.rust-toolchain == 'stable' && endsWith(matrix.os, '-latest')
+        if: matrix.type == 'debug' && matrix.rust-toolchain == 'nightly' && endsWith(matrix.os, '-latest')
 
       - name: Run tests with sanitizers
         if: (matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest') && matrix.rust-toolchain == 'nightly'
@@ -272,12 +272,12 @@ jobs:
             pkg install -y curl llvm
           run: | # This executes as user
             set -e
-            sh rustup.sh --default-toolchain stable --profile minimal --component clippy llvm-tools -y
+            sh rustup.sh --default-toolchain nightly --profile minimal --component clippy llvm-tools -y
             . "$HOME/.cargo/env"
             cargo check --all-targets
             cargo clippy -- -D warnings
             cargo install cargo-llvm-cov --locked
-            cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
+            cargo llvm-cov test --mcdc --include-ffi --no-fail-fast --codecov --output-path codecov.json
             cargo test --no-fail-fast --release
             rm -rf target # Don't sync this back to host
 
@@ -300,7 +300,7 @@ jobs:
             # export LLVM_COV=/usr/local/llvm16/bin/llvm-cov
             # export LLVM_PROFDATA=/usr/local/llvm16/bin/llvm-profdata
             # cargo install cargo-llvm-cov --locked
-            # cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
+            # cargo llvm-cov test --mcdc --include-ffi --no-fail-fast --codecov --output-path codecov.json
             cargo test --no-fail-fast # Remove this once profiler is supported
             cargo test --no-fail-fast --release
             rm -rf target # Don't sync this back to host
@@ -316,7 +316,7 @@ jobs:
             pkgin -y install curl clang
           run: | # This executes as user
             set -e
-            sh rustup.sh --default-toolchain stable --profile minimal --component clippy llvm-tools -y
+            sh rustup.sh --default-toolchain nightly --profile minimal --component clippy llvm-tools -y
             . "$HOME/.cargo/env"
             cargo check --all-targets
             cargo clippy -- -D warnings
@@ -324,7 +324,7 @@ jobs:
             # > error[E0463]: can't find crate for `profiler_builtins`
             # > = note: the compiler may have been built without the profiler runtime
             # cargo install cargo-llvm-cov --locked
-            # cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
+            # cargo llvm-cov test --mcdc --include-ffi --no-fail-fast --codecov --output-path codecov.json
             cargo test --no-fail-fast # Remove this once profiler is supported
             cargo test --no-fail-fast --release
             rm -rf target # Don't sync this back to host
@@ -348,14 +348,14 @@ jobs:
             # > error[E0463]: can't find crate for `profiler_builtins`
             # > = note: the compiler may have been built without the profiler runtime
             # cargo install cargo-llvm-cov --locked
-            # cargo llvm-cov test --no-fail-fast --lcov --output-path lcov.info
+            # cargo llvm-cov test --mcdc --include-ffi --no-fail-fast --codecov --output-path codecov.json
             cargo test --no-fail-fast # Remove this once profiler is supported
             cargo test --no-fail-fast --release
             rm -rf target # Don't sync this back to host
 
       - uses: codecov/codecov-action@7f8b4b4bde536c465e797be725718b88c5d95e0e # v5.1.1
         with:
-          files: lcov.info
+          files: codecov.json
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
