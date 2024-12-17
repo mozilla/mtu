@@ -16,7 +16,7 @@ fn clang_args() -> Vec<String> {
     let mut flags: Vec<String> = std::fs::read_to_string(flags_path)
         .expect("Failed to read extra-bindgen-flags file")
         .split_whitespace()
-        .to_owned()
+        .map(std::borrow::ToOwned::to_owned)
         .collect();
 
     flags.push(String::from("-include"));
@@ -48,14 +48,11 @@ fn bindgen() {
     let bindings = bindgen::Builder::default()
         .header_contents(
             "route.h",
-            if cfg!(any(target_os = "freebsd", target_os = "openbsd")) {
-                "#include <sys/types.h>\n#include <sys/socket.h>\n#include <net/route.h>"
-            } else {
-                "#include <net/route.h>"
-            },
+            "#include <sys/types.h>\n#include <sys/socket.h>\n#include <net/route.h>\n#include <net/if.h>",
         )
-        // Only generate bindings for the following types
-        .allowlist_type("rt_msghdr|rt_metrics");
+        // Only generate bindings for the following types and items
+        .allowlist_type("rt_msghdr|rt_metrics|if_data")
+        .allowlist_item("RTAX_MAX|RTM_GET|RTM_VERSION|RTA_DST|RTA_IFP");
     let bindings = bindings
         .clang_args(clang_args())
         // Tell cargo to invalidate the built crate whenever any of the
@@ -123,7 +120,8 @@ fn main() {
             any(
                 target_os = "freebsd",
                 target_os = "openbsd",
-                target_os = "netbsd"
+                target_os = "netbsd",
+                target_os = "solaris"
             )
         }
     }

@@ -29,6 +29,7 @@ println!("MTU towards {destination} is {mtu} on {name}");
 * FreeBSD
 * NetBSD
 * OpenBSD
+* Solaris
 
 ## Notes
 

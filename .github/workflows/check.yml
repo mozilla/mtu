@@ -253,8 +253,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [freebsd, openbsd, netbsd] # rust on solaris is too old
+        os: [freebsd, openbsd, netbsd, solaris]
     runs-on: ubuntu-latest
+    env:
+      RUST_LOG: trace
 
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -264,70 +266,92 @@ jobs:
         uses: vmactions/freebsd-vm@debf37ca7b7fa40e19c542ef7ba30d6054a706a4
         with:
           usesh: true
-          envs: "CARGO_TERM_COLOR RUST_BACKTRACE GITHUB_ACTIONS"
-          prepare: |
+          envs: "CARGO_TERM_COLOR RUST_BACKTRACE RUST_LOG GITHUB_ACTIONS"
+          prepare: | # This executes as root
+            set -e
             pkg install -y curl llvm
-          run: |
-            sh rustup.sh --default-toolchain nightly --component llvm-tools -y
+          run: | # This executes as user
+            set -e
+            sh rustup.sh --default-toolchain nightly --profile minimal --component clippy llvm-tools -y
             . "$HOME/.cargo/env"
-            export RUST_LOG=trace
-            cargo install cargo-llvm-cov --locked
             cargo check --all-targets
-            cargo clippy
+            cargo clippy -- -D warnings
+            cargo install cargo-llvm-cov --locked
             cargo llvm-cov test --mcdc --include-ffi --no-fail-fast --codecov --output-path codecov.json
             cargo test --no-fail-fast --release
+            rm -rf target # Don't sync this back to host
 
       - if: matrix.os == 'openbsd'
         uses: vmactions/openbsd-vm@0cfe06e734a0ea3a546fca7ebf200b984b94d58a
         with:
           usesh: true
-          envs: "CARGO_TERM_COLOR RUST_BACKTRACE GITHUB_ACTIONS"
-          prepare: |
-            pkg_add rust llvm-16.0.6p30 # rustup doesn't support OpenBSD at all
-          run: |
+          envs: "CARGO_TERM_COLOR RUST_BACKTRACE RUST_LOG GITHUB_ACTIONS"
+          prepare: | # This executes as root
+            set -e
+            pkg_add rust rust-clippy llvm-16.0.6p30 # rustup doesn't support OpenBSD at all
+          run: | # This executes as user
+            set -e
             export LIBCLANG_PATH=/usr/local/llvm16/lib
-            export RUST_LOG=trace
             cargo check --all-targets
-            cargo clippy
-            cargo test --no-fail-fast
+            cargo clippy -- -D warnings
+            # FIXME: No profiler support in openbsd currently, error is:
+            # > error[E0463]: can't find crate for `profiler_builtins`
+            # > = note: the compiler may have been built without the profiler runtime
+            # export LLVM_COV=/usr/local/llvm16/bin/llvm-cov
+            # export LLVM_PROFDATA=/usr/local/llvm16/bin/llvm-profdata
+            # cargo install cargo-llvm-cov --locked
+            # cargo llvm-cov test --mcdc --include-ffi --no-fail-fast --codecov --output-path codecov.json
+            cargo test --no-fail-fast # Remove this once profiler is supported
             cargo test --no-fail-fast --release
+            rm -rf target # Don't sync this back to host
 
       - if: matrix.os == 'netbsd'
         uses: vmactions/netbsd-vm@7c9086fdb4cc1aa814cda6e305390c2b966551a9
         with:
           usesh: true
-          envs: "CARGO_TERM_COLOR RUST_BACKTRACE GITHUB_ACTIONS"
-          prepare: |
+          envs: "CARGO_TERM_COLOR RUST_BACKTRACE RUST_LOG GITHUB_ACTIONS"
+          prepare: | # This executes as root
+            set -e
             /usr/sbin/pkg_add pkgin
             pkgin -y install curl clang
-          run: |
-            sh rustup.sh --default-toolchain nightly --component llvm-tools -y
+          run: | # This executes as user
+            set -e
+            sh rustup.sh --default-toolchain nightly --profile minimal --component clippy llvm-tools -y
             . "$HOME/.cargo/env"
-            export LIBCLANG_PATH=/usr/pkg/lib
-            export RUST_LOG=trace
-            cargo install cargo-llvm-cov --locked
             cargo check --all-targets
-            cargo clippy
-            cargo test --no-fail-fast
-            # FIXME: error[E0463]: can't find crate for `profiler_builtins`,
-            # so don't fail the workflow when that happens.
-            cargo llvm-cov test --mcdc --include-ffi --no-fail-fast --codecov --output-path codecov.json || true
+            cargo clippy -- -D warnings
+            # FIXME: No profiler support in netbsd currently, error is:
+            # > error[E0463]: can't find crate for `profiler_builtins`
+            # > = note: the compiler may have been built without the profiler runtime
+            # cargo install cargo-llvm-cov --locked
+            # cargo llvm-cov test --mcdc --include-ffi --no-fail-fast --codecov --output-path codecov.json
+            cargo test --no-fail-fast # Remove this once profiler is supported
             cargo test --no-fail-fast --release
+            rm -rf target # Don't sync this back to host
 
       - if: matrix.os == 'solaris'
         uses: vmactions/solaris-vm@a89b9438868c70db27e41625f0a5de6ff5e90809
         with:
+          release: "11.4-gcc"
           usesh: true
-          envs: "CARGO_TERM_COLOR RUST_BACKTRACE GITHUB_ACTIONS"
-          run: |
-            sh rustup.sh --default-toolchain nightly --component llvm-tools -y
-            . "$HOME/.cargo/env"
-            export RUST_LOG=trace
-            cargo install cargo-llvm-cov --locked
+          envs: "CARGO_TERM_COLOR RUST_BACKTRACE RUST_LOG GITHUB_ACTIONS"
+          prepare: | # This executes as root
+            set -e
+            pkg install clang-libs
+          run: | # This executes as also as root on Solaris
+            set -e
+            source <(curl -s https://raw.githubusercontent.com/psumbera/solaris-rust/refs/heads/main/sh.rust-web-install) || true # This doesn't exit with zero on success
+            export LIBCLANG_PATH="/usr/lib/amd64"
             cargo check --all-targets
-            cargo clippy
-            cargo llvm-cov test --mcdc --include-ffi --no-fail-fast --codecov --output-path codecov.json
+            cargo clippy -- -D warnings
+            # FIXME: No profiler support in openbsd currently, error is:
+            # > error[E0463]: can't find crate for `profiler_builtins`
+            # > = note: the compiler may have been built without the profiler runtime
+            # cargo install cargo-llvm-cov --locked
+            # cargo llvm-cov test --mcdc --include-ffi --no-fail-fast --codecov --output-path codecov.json
+            cargo test --no-fail-fast # Remove this once profiler is supported
             cargo test --no-fail-fast --release
+            rm -rf target # Don't sync this back to host
 
       - uses: codecov/codecov-action@7f8b4b4bde536c465e797be725718b88c5d95e0e # v5.1.1
         with:

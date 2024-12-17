@@ -10,48 +10,64 @@ use std::{
     marker::PhantomData,
     mem::size_of,
     net::IpAddr,
+    num::TryFromIntError,
     ops::Deref,
     ptr, slice,
 };
 
 use libc::{
-    freeifaddrs, getifaddrs, getpid, if_data, if_indextoname, ifaddrs, in6_addr, in_addr,
-    sockaddr_in, sockaddr_in6, sockaddr_storage, AF_UNSPEC, PF_ROUTE, RTAX_MAX,
+    freeifaddrs, getifaddrs, getpid, if_indextoname, ifaddrs, in6_addr, in_addr, sockaddr,
+    sockaddr_dl, sockaddr_in, sockaddr_in6, sockaddr_storage, AF_UNSPEC, PF_ROUTE,
 };
 use static_assertions::{const_assert, const_assert_eq};
 
 #[allow(
     non_camel_case_types,
     clippy::struct_field_names,
-    clippy::too_many_lines
+    clippy::too_many_lines,
+    clippy::cognitive_complexity,
+    dead_code // RTA_IFP is only used on NetBSD and Solaris
 )]
 mod bindings {
     include!(env!("BINDINGS"));
 }
 
-use crate::{bsd::bindings::rt_msghdr, routesocket::RouteSocket};
-
-#[cfg(any(apple, target_os = "freebsd", target_os = "openbsd"))]
-const RTM_ADDRS: i32 = libc::RTA_DST;
-
-#[cfg(target_os = "netbsd")]
-const RTM_ADDRS: i32 = libc::RTA_DST | libc::RTA_IFP;
+#[cfg(any(target_os = "netbsd", target_os = "solaris"))]
+use crate::bsd::bindings::RTA_IFP;
+use crate::{
+    aligned_by,
+    bsd::bindings::{if_data, rt_msghdr, RTAX_MAX, RTA_DST},
+    default_err,
+    routesocket::RouteSocket,
+    unlikely_err,
+};
 
 #[cfg(apple)]
 const ALIGN: usize = size_of::<libc::c_int>();
 
-#[cfg(any(target_os = "freebsd", target_os = "netbsd", target_os = "openbsd"))]
+#[cfg(bsd)]
 // See https://github.com/freebsd/freebsd-src/blob/524a425d30fce3d5e47614db796046830b1f6a83/sys/net/route.h#L362-L371
 // See https://github.com/NetBSD/src/blob/4b50954e98313db58d189dd87b4541929efccb09/sys/net/route.h#L329-L331
+// See https://github.com/Arquivotheca/Solaris-8/blob/2ad1d32f9eeed787c5adb07eb32544276e2e2444/osnet_volume/usr/src/cmd/cmd-inet/usr.sbin/route.c#L238-L239
 const ALIGN: usize = size_of::<libc::c_long>();
 
-use crate::{aligned_by, default_err};
+#[cfg(any(apple, target_os = "freebsd", target_os = "openbsd"))]
+asserted_const_with_type!(RTM_ADDRS, i32, RTA_DST, u32);
 
-asserted_const_with_type!(AF_INET, u8, libc::AF_INET, i32);
-asserted_const_with_type!(AF_INET6, u8, libc::AF_INET6, i32);
-asserted_const_with_type!(AF_LINK, u8, libc::AF_LINK, i32);
-asserted_const_with_type!(RTM_VERSION, u8, libc::RTM_VERSION, i32);
-asserted_const_with_type!(RTM_GET, u8, libc::RTM_GET, i32);
+#[cfg(any(target_os = "netbsd", target_os = "solaris"))]
+asserted_const_with_type!(RTM_ADDRS, i32, RTA_DST | RTA_IFP, u32);
+
+#[cfg(not(target_os = "solaris"))]
+type AddressFamily = u8;
+
+#[cfg(target_os = "solaris")]
+type AddressFamily = u16;
+
+asserted_const_with_type!(AF_INET, AddressFamily, libc::AF_INET, i32);
+asserted_const_with_type!(AF_INET6, AddressFamily, libc::AF_INET6, i32);
+asserted_const_with_type!(AF_LINK, AddressFamily, libc::AF_LINK, i32);
+asserted_const_with_type!(RTM_VERSION, u8, crate::bsd::bindings::RTM_VERSION, u32);
+asserted_const_with_type!(RTM_GET, u8, crate::bsd::bindings::RTM_GET, u32);
 
 const_assert!(size_of::<sockaddr_in>() + ALIGN <= u8::MAX as usize);
 const_assert!(size_of::<sockaddr_in6>() + ALIGN <= u8::MAX as usize);
@@ -138,7 +154,7 @@ impl Iterator for IfAddrPtr<'_> {
     }
 }
 
-fn if_name_mtu(idx: u32) -> Result<(String, usize)> {
+fn if_name_mtu(idx: u32) -> Result<(String, Option<usize>)> {
     let mut name = [0; libc::IF_NAMESIZE];
     // if_indextoname writes into the provided buffer.
     if unsafe { if_indextoname(idx, name.as_mut_ptr()).is_null() } {
@@ -150,18 +166,12 @@ fn if_name_mtu(idx: u32) -> Result<(String, usize)> {
             .to_str()
             .map_err(|err| Error::new(ErrorKind::Other, err))?
     };
-
-    for ifa in IfAddrs::new()?.iter() {
-        if ifa.addr().sa_family == AF_LINK && ifa.name() == name {
-            if let Some(ifa_data) = ifa.data() {
-                if let Ok(mtu) = usize::try_from(ifa_data.ifi_mtu) {
-                    return Ok((name.to_string(), mtu));
-                }
-            }
-            return Err(default_err());
-        }
-    }
-    Err(default_err())
+    let mtu = IfAddrs::new()?
+        .iter()
+        .find(|ifa| ifa.addr().sa_family == AF_LINK && ifa.name() == name)
+        .and_then(|ifa| ifa.data())
+        .and_then(|ifa_data| usize::try_from(ifa_data.ifi_mtu).ok());
+    Ok((name.to_string(), mtu))
 }
 
 #[repr(C)]
@@ -170,10 +180,18 @@ union SockaddrStorage {
     sin6: sockaddr_in6,
 }
 
-impl SockaddrStorage {
-    const fn len(&self) -> u8 {
-        unsafe { self.sin.sin_len }
-    }
+fn sockaddr_len(af: AddressFamily) -> Result<usize> {
+    let sa_len = match af {
+        AF_INET => size_of::<sockaddr_in>(),
+        AF_INET6 => size_of::<sockaddr_in6>(),
+        _ => {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "Unsupported address family {af:?}",
+            ))
+        }
+    };
+    Ok(aligned_by(sa_len, ALIGN))
 }
 
 impl From<IpAddr> for SockaddrStorage {
@@ -181,6 +199,7 @@ impl From<IpAddr> for SockaddrStorage {
         match ip {
             IpAddr::V4(ip) => SockaddrStorage {
                 sin: sockaddr_in {
+                #[cfg(not(target_os = "solaris"))]
                 #[allow(clippy::cast_possible_truncation)]
                 // `sockaddr_in` len is <= u8::MAX per `const_assert!` above.
                 sin_len: size_of::<sockaddr_in>() as u8,
@@ -194,6 +213,7 @@ impl From<IpAddr> for SockaddrStorage {
             },
             IpAddr::V6(ip) => SockaddrStorage {
                 sin6: sockaddr_in6 {
+                #[cfg(not(target_os = "solaris"))]
                 #[allow(clippy::cast_possible_truncation)]
                 // `sockaddr_in6` len is <= u8::MAX per `const_assert!` above.
                 sin6_len: size_of::<sockaddr_in6>() as u8,
@@ -204,7 +224,9 @@ impl From<IpAddr> for SockaddrStorage {
                 sin6_port: 0,
                 sin6_flowinfo: 0,
                 sin6_scope_id: 0,
-            },
+                #[cfg(target_os = "solaris")]
+                __sin6_src_id: 0,
+                },
             },
         }
     }
@@ -217,13 +239,17 @@ struct RouteMessage {
 }
 
 impl RouteMessage {
-    fn new(remote: IpAddr, seq: i32) -> Self {
+    fn new(remote: IpAddr, seq: i32) -> Result<Self> {
         let sa = SockaddrStorage::from(remote);
-        Self {
+        let sa_len = sockaddr_len(match remote {
+            IpAddr::V4(_) => AF_INET,
+            IpAddr::V6(_) => AF_INET6,
+        })?;
+        Ok(Self {
             rtm: rt_msghdr {
                 #[allow(clippy::cast_possible_truncation)]
                 // `rt_msghdr` len + `ALIGN` is <= u8::MAX per `const_assert!` above.
-                rtm_msglen: (size_of::<rt_msghdr>() + aligned_by(sa.len().into(), ALIGN)) as u16,
+                rtm_msglen: (size_of::<rt_msghdr>() + sa_len) as u16,
                 rtm_version: RTM_VERSION,
                 rtm_type: RTM_GET,
                 rtm_seq: seq,
@@ -231,7 +257,7 @@ impl RouteMessage {
                 ..Default::default()
             },
             sa,
-        }
+        })
     }
 
     const fn version(&self) -> u8 {
@@ -254,20 +280,20 @@ impl From<&RouteMessage> for &[u8] {
     }
 }
 
-impl From<Vec<u8>> for rt_msghdr {
-    fn from(value: Vec<u8>) -> Self {
+impl From<&[u8]> for rt_msghdr {
+    fn from(value: &[u8]) -> Self {
         debug_assert!(value.len() >= size_of::<Self>());
         unsafe { ptr::read_unaligned(value.as_ptr().cast()) }
     }
 }
 
-fn if_index(remote: IpAddr) -> Result<u16> {
+fn if_index_mtu(remote: IpAddr) -> Result<(u16, Option<usize>)> {
     // Open route socket.
     let mut fd = RouteSocket::new(PF_ROUTE, AF_UNSPEC)?;
 
     // Send route message.
     let query_seq = RouteSocket::new_seq();
-    let query = RouteMessage::new(remote, query_seq);
+    let query = RouteMessage::new(remote, query_seq)?;
     let query_version = query.version();
     let query_type = query.kind();
     fd.write_all((&query).into())?;
@@ -285,21 +311,54 @@ fn if_index(remote: IpAddr) -> Result<u16> {
         if len < size_of::<rt_msghdr>() {
             return Err(default_err());
         }
-        let reply: rt_msghdr = buf.into();
-        if reply.rtm_version == query_version && reply.rtm_pid == pid && reply.rtm_seq == query_seq
+        let (reply, mut sa) = buf.split_at(size_of::<rt_msghdr>());
+        let reply: rt_msghdr = reply.into();
+        if !(reply.rtm_version == query_version
+            && reply.rtm_pid == pid
+            && reply.rtm_seq == query_seq)
         {
-            // This is a reply to our query.
-            return if reply.rtm_type == query_type {
-                // This is the reply we are looking for.
-                Ok(reply.rtm_index)
-            } else {
-                Err(default_err())
-            };
+            continue;
+        }
+        if reply.rtm_type != query_type {
+            return Err(default_err());
+        }
+
+        // This is a reply to our query.
+        // This is the reply we are looking for.
+        // Some BSDs let us get the interface index and MTU directly from the reply.
+        let mtu: Option<usize> = if reply.rtm_rmx.rmx_mtu != 0 {
+            Some(
+                reply
+                    .rtm_rmx
+                    .rmx_mtu
+                    .try_into()
+                    .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?,
+            )
+        } else {
+            None
+        };
+        if reply.rtm_index != 0 {
+            // Some BSDs return the interface index directly.
+            return Ok((reply.rtm_index, mtu));
+        }
+        // For others, we need to extract it from the sockaddrs.
+        for i in 0..RTAX_MAX {
+            if (reply.rtm_addrs & (1 << i)) == 0 {
+                continue;
+            }
+            let saddr = unsafe { ptr::read_unaligned(sa.as_ptr().cast::<sockaddr>()) };
+            if saddr.sa_family != AF_LINK {
+                (_, sa) = sa.split_at(sockaddr_len(saddr.sa_family)?);
+                continue;
+            }
+            let sdl = unsafe { ptr::read_unaligned(sa.as_ptr().cast::<sockaddr_dl>()) };
+            return Ok((sdl.sdl_index, mtu));
         }
     }
 }
 
 pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize)> {
-    let if_index = if_index(remote)?;
-    if_name_mtu(if_index.into())
+    let (if_index, mtu1) = if_index_mtu(remote)?;
+    let (if_name, mtu2) = if_name_mtu(if_index.into())?;
+    Ok((if_name, mtu1.or(mtu2).ok_or_else(default_err)?))
 }
