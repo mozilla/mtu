@@ -1,5 +1,6 @@
 .DS_Store
 *~
 /.vscode/
+/codecov.json
 /lcov.info
 /target/
