@@ -65,6 +65,10 @@ jobs:
           - os: windows-2019
             rust-toolchain: stable
             type: debug
+          # TODO: Remove once https://github.com/rust-lang/rust/issues/111073#issuecomment-2561607617 is fixed.
+          - os: ubuntu-22.04
+            rust-toolchain: nightly
+            type: debug
     env:
       BUILD_TYPE: ${{ matrix.type == 'release' && '--release' || '' }}
     runs-on: ${{ matrix.os }}
@@ -123,7 +127,8 @@ jobs:
         if: matrix.type == 'debug' && matrix.rust-toolchain == 'nightly' && endsWith(matrix.os, '-latest')
 
       - name: Run tests with sanitizers
-        if: (matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest') && matrix.rust-toolchain == 'nightly'
+        # TODO: Unpin ubuntu when https://github.com/rust-lang/rust/issues/111073#issuecomment-2561607617 is fixed.
+        if: (matrix.os == 'ubuntu-22.04' || matrix.os == 'macos-latest') && matrix.rust-toolchain == 'nightly'
         env:
           RUST_LOG: trace
           ASAN_OPTIONS: detect_leaks=1:detect_stack_use_after_return=1
