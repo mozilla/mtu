@@ -7,7 +7,7 @@
 use std::{
     io::{Error, Read, Result, Write},
     num::TryFromIntError,
-    os::fd::{AsRawFd, FromRawFd, OwnedFd},
+    os::fd::{AsRawFd, FromRawFd as _, OwnedFd},
     sync::atomic::Ordering,
 };
 

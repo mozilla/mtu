@@ -70,7 +70,8 @@ fn bindgen() {
         .expect("Unable to generate bindings");
 
     // Write the bindings to the $OUT_DIR/$BINDINGS file.
-    let out_path = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap()).join(BINDINGS);
+    let out_path =
+        std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap_or_default()).join(BINDINGS);
     bindings
         .write_to_file(out_path.clone())
         .expect("Couldn't write bindings!");

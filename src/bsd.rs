@@ -6,9 +6,8 @@
 
 use std::{
     ffi::CStr,
-    io::{Error, ErrorKind, Read, Result, Write},
+    io::{Error, ErrorKind, Read as _, Result, Write as _},
     marker::PhantomData,
-    mem::size_of,
     net::IpAddr,
     num::TryFromIntError,
     ops::Deref,
@@ -104,7 +103,9 @@ impl Drop for IfAddrs {
     fn drop(&mut self) {
         if !self.0.is_null() {
             // Free the memory allocated by `getifaddrs`.
-            unsafe { freeifaddrs(self.0) };
+            unsafe {
+                freeifaddrs(self.0);
+            }
         }
     }
 }
@@ -136,7 +137,7 @@ impl Deref for IfAddrPtr<'_> {
     type Target = ifaddrs;
 
     fn deref(&self) -> &Self::Target {
-        unsafe { self.ptr.as_ref().unwrap() }
+        unsafe { self.ptr.as_ref().expect("can deref") }
     }
 }
 
@@ -326,17 +327,10 @@ fn if_index_mtu(remote: IpAddr) -> Result<(u16, Option<usize>)> {
         // This is a reply to our query.
         // This is the reply we are looking for.
         // Some BSDs let us get the interface index and MTU directly from the reply.
-        let mtu: Option<usize> = if reply.rtm_rmx.rmx_mtu != 0 {
-            Some(
-                reply
-                    .rtm_rmx
-                    .rmx_mtu
-                    .try_into()
-                    .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?,
-            )
-        } else {
-            None
-        };
+        let mtu = (reply.rtm_rmx.rmx_mtu != 0)
+            .then(|| usize::try_from(reply.rtm_rmx.rmx_mtu))
+            .transpose()
+            .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?;
         if reply.rtm_index != 0 {
             // Some BSDs return the interface index directly.
             return Ok((reply.rtm_index, mtu));
