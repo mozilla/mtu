@@ -4,6 +4,8 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+#![allow(clippy::unwrap_used)] // OK in build scripts.
+
 const BINDINGS: &str = "bindings.rs";
 
 #[cfg(feature = "gecko")]
@@ -70,8 +72,7 @@ fn bindgen() {
         .expect("Unable to generate bindings");
 
     // Write the bindings to the $OUT_DIR/$BINDINGS file.
-    let out_path =
-        std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap_or_default()).join(BINDINGS);
+    let out_path = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap()).join(BINDINGS);
     bindings
         .write_to_file(out_path.clone())
         .expect("Couldn't write bindings!");
@@ -80,11 +81,10 @@ fn bindgen() {
 
 #[cfg(windows)]
 fn bindgen() {
-    let out_path =
-        std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap_or_default()).join(BINDINGS);
+    let out_path = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap()).join(BINDINGS);
     windows_bindgen::bindgen([
         "--out",
-        out_path.to_str().unwrap_or_default(),
+        out_path.to_str().unwrap(),
         "--config",
         "flatten",
         "no-inner-attributes",
