@@ -80,10 +80,11 @@ fn bindgen() {
 
 #[cfg(windows)]
 fn bindgen() {
-    let out_path = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap()).join(BINDINGS);
+    let out_path =
+        std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap_or_default()).join(BINDINGS);
     windows_bindgen::bindgen([
         "--out",
-        out_path.to_str().unwrap(),
+        out_path.to_str().unwrap_or_default(),
         "--config",
         "flatten",
         "no-inner-attributes",

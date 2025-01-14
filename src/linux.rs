@@ -6,8 +6,7 @@
 
 use std::{
     ffi::CStr,
-    io::{Error, ErrorKind, Read, Result, Write},
-    mem::size_of,
+    io::{Error, ErrorKind, Read as _, Result, Write as _},
     net::IpAddr,
     num::TryFromIntError,
     ptr, slice,
