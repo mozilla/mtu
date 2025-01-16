@@ -7,7 +7,7 @@
 use std::{
     io::{Error, Read, Result, Write},
     num::TryFromIntError,
-    os::fd::{AsRawFd, FromRawFd, OwnedFd},
+    os::fd::{AsRawFd, FromRawFd as _, OwnedFd},
     sync::atomic::Ordering,
 };
 
@@ -60,19 +60,19 @@ fn check_result(res: isize) -> Result<usize> {
 }
 
 impl Write for RouteSocket {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+    fn write(&mut self, buf: &[u8]) -> Result<usize> {
         let res = unsafe { write(self.as_raw_fd(), buf.as_ptr().cast(), buf.len()) };
         check_result(res)
     }
 
-    fn flush(&mut self) -> std::io::Result<()> {
+    fn flush(&mut self) -> Result<()> {
         let res = unsafe { fsync(self.as_raw_fd()) };
         check_result(res as isize).and(Ok(()))
     }
 }
 
 impl Read for RouteSocket {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
         // If we've written a well-formed message into the kernel via `write`, we should be able to
         // read a well-formed message back out, and not block.
         let res = unsafe { read(self.as_raw_fd(), buf.as_mut_ptr().cast(), buf.len()) };

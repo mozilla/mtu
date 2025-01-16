@@ -6,9 +6,8 @@
 
 use std::{
     ffi::CStr,
-    io::{Error, ErrorKind, Read, Result, Write},
+    io::{Error, ErrorKind, Read as _, Result, Write as _},
     marker::PhantomData,
-    mem::size_of,
     net::IpAddr,
     num::TryFromIntError,
     ops::Deref,
@@ -43,13 +42,13 @@ use crate::{
 };
 
 #[cfg(apple)]
-const ALIGN: usize = size_of::<libc::c_int>();
+const ALIGN: usize = std::mem::size_of::<libc::c_int>();
 
 #[cfg(bsd)]
 // See https://github.com/freebsd/freebsd-src/blob/524a425d30fce3d5e47614db796046830b1f6a83/sys/net/route.h#L362-L371
 // See https://github.com/NetBSD/src/blob/4b50954e98313db58d189dd87b4541929efccb09/sys/net/route.h#L329-L331
 // See https://github.com/Arquivotheca/Solaris-8/blob/2ad1d32f9eeed787c5adb07eb32544276e2e2444/osnet_volume/usr/src/cmd/cmd-inet/usr.sbin/route.c#L238-L239
-const ALIGN: usize = size_of::<libc::c_long>();
+const ALIGN: usize = std::mem::size_of::<libc::c_long>();
 
 #[cfg(any(apple, target_os = "freebsd", target_os = "openbsd"))]
 asserted_const_with_type!(RTM_ADDRS, i32, RTA_DST, u32);
@@ -66,12 +65,12 @@ type AddressFamily = u16;
 asserted_const_with_type!(AF_INET, AddressFamily, libc::AF_INET, i32);
 asserted_const_with_type!(AF_INET6, AddressFamily, libc::AF_INET6, i32);
 asserted_const_with_type!(AF_LINK, AddressFamily, libc::AF_LINK, i32);
-asserted_const_with_type!(RTM_VERSION, u8, crate::bsd::bindings::RTM_VERSION, u32);
-asserted_const_with_type!(RTM_GET, u8, crate::bsd::bindings::RTM_GET, u32);
+asserted_const_with_type!(RTM_VERSION, u8, bindings::RTM_VERSION, u32);
+asserted_const_with_type!(RTM_GET, u8, bindings::RTM_GET, u32);
 
-const_assert!(size_of::<sockaddr_in>() + ALIGN <= u8::MAX as usize);
-const_assert!(size_of::<sockaddr_in6>() + ALIGN <= u8::MAX as usize);
-const_assert!(size_of::<rt_msghdr>() <= u8::MAX as usize);
+const_assert!(std::mem::size_of::<sockaddr_in>() + ALIGN <= u8::MAX as usize);
+const_assert!(std::mem::size_of::<sockaddr_in6>() + ALIGN <= u8::MAX as usize);
+const_assert!(std::mem::size_of::<rt_msghdr>() <= u8::MAX as usize);
 
 struct IfAddrs(*mut ifaddrs);
 
@@ -104,7 +103,9 @@ impl Drop for IfAddrs {
     fn drop(&mut self) {
         if !self.0.is_null() {
             // Free the memory allocated by `getifaddrs`.
-            unsafe { freeifaddrs(self.0) };
+            unsafe {
+                freeifaddrs(self.0);
+            }
         }
     }
 }
@@ -115,7 +116,7 @@ struct IfAddrPtr<'a> {
 }
 
 impl IfAddrPtr<'_> {
-    fn addr(&self) -> libc::sockaddr {
+    fn addr(&self) -> sockaddr {
         unsafe { *self.ifa_addr }
     }
 
@@ -136,7 +137,7 @@ impl Deref for IfAddrPtr<'_> {
     type Target = ifaddrs;
 
     fn deref(&self) -> &Self::Target {
-        unsafe { self.ptr.as_ref().unwrap() }
+        unsafe { self.ptr.as_ref().expect("can deref") }
     }
 }
 
@@ -182,8 +183,8 @@ union SockaddrStorage {
 
 fn sockaddr_len(af: AddressFamily) -> Result<usize> {
     let sa_len = match af {
-        AF_INET => size_of::<sockaddr_in>(),
-        AF_INET6 => size_of::<sockaddr_in6>(),
+        AF_INET => std::mem::size_of::<sockaddr_in>(),
+        AF_INET6 => std::mem::size_of::<sockaddr_in6>(),
         _ => {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
@@ -202,7 +203,7 @@ impl From<IpAddr> for SockaddrStorage {
                 #[cfg(not(target_os = "solaris"))]
                 #[allow(clippy::cast_possible_truncation)]
                 // `sockaddr_in` len is <= u8::MAX per `const_assert!` above.
-                sin_len: size_of::<sockaddr_in>() as u8,
+                sin_len: std::mem::size_of::<sockaddr_in>() as u8,
                 sin_family: AF_INET,
                 sin_addr: in_addr {
                     s_addr: u32::from_ne_bytes(ip.octets()),
@@ -216,7 +217,7 @@ impl From<IpAddr> for SockaddrStorage {
                 #[cfg(not(target_os = "solaris"))]
                 #[allow(clippy::cast_possible_truncation)]
                 // `sockaddr_in6` len is <= u8::MAX per `const_assert!` above.
-                sin6_len: size_of::<sockaddr_in6>() as u8,
+                sin6_len: std::mem::size_of::<sockaddr_in6>() as u8,
                 sin6_family: AF_INET6,
                 sin6_addr: in6_addr {
                     s6_addr: ip.octets(),
@@ -249,7 +250,7 @@ impl RouteMessage {
             rtm: rt_msghdr {
                 #[allow(clippy::cast_possible_truncation)]
                 // `rt_msghdr` len + `ALIGN` is <= u8::MAX per `const_assert!` above.
-                rtm_msglen: (size_of::<rt_msghdr>() + sa_len) as u16,
+                rtm_msglen: (std::mem::size_of::<rt_msghdr>() + sa_len) as u16,
                 rtm_version: RTM_VERSION,
                 rtm_type: RTM_GET,
                 rtm_seq: seq,
@@ -275,14 +276,14 @@ impl RouteMessage {
 
 impl From<&RouteMessage> for &[u8] {
     fn from(value: &RouteMessage) -> Self {
-        debug_assert!(value.len() >= size_of::<Self>());
+        debug_assert!(value.len() >= std::mem::size_of::<Self>());
         unsafe { slice::from_raw_parts(ptr::from_ref(value).cast(), value.len()) }
     }
 }
 
 impl From<&[u8]> for rt_msghdr {
     fn from(value: &[u8]) -> Self {
-        debug_assert!(value.len() >= size_of::<Self>());
+        debug_assert!(value.len() >= std::mem::size_of::<Self>());
         unsafe { ptr::read_unaligned(value.as_ptr().cast()) }
     }
 }
@@ -303,15 +304,15 @@ fn if_index_mtu(remote: IpAddr) -> Result<(u16, Option<usize>)> {
     loop {
         let mut buf = vec![
             0u8;
-            size_of::<rt_msghdr>() +
+            std::mem::size_of::<rt_msghdr>() +
         // There will never be `RTAX_MAX` sockaddrs attached, but it's a safe upper bound.
-         (RTAX_MAX as usize * size_of::<sockaddr_storage>())
+         (RTAX_MAX as usize * std::mem::size_of::<sockaddr_storage>())
         ];
         let len = fd.read(&mut buf[..])?;
-        if len < size_of::<rt_msghdr>() {
+        if len < std::mem::size_of::<rt_msghdr>() {
             return Err(default_err());
         }
-        let (reply, mut sa) = buf.split_at(size_of::<rt_msghdr>());
+        let (reply, mut sa) = buf.split_at(std::mem::size_of::<rt_msghdr>());
         let reply: rt_msghdr = reply.into();
         if !(reply.rtm_version == query_version
             && reply.rtm_pid == pid
@@ -326,17 +327,10 @@ fn if_index_mtu(remote: IpAddr) -> Result<(u16, Option<usize>)> {
         // This is a reply to our query.
         // This is the reply we are looking for.
         // Some BSDs let us get the interface index and MTU directly from the reply.
-        let mtu: Option<usize> = if reply.rtm_rmx.rmx_mtu != 0 {
-            Some(
-                reply
-                    .rtm_rmx
-                    .rmx_mtu
-                    .try_into()
-                    .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?,
-            )
-        } else {
-            None
-        };
+        let mtu = (reply.rtm_rmx.rmx_mtu != 0)
+            .then(|| usize::try_from(reply.rtm_rmx.rmx_mtu))
+            .transpose()
+            .map_err(|e: TryFromIntError| unlikely_err(e.to_string()))?;
         if reply.rtm_index != 0 {
             // Some BSDs return the interface index directly.
             return Ok((reply.rtm_index, mtu));

@@ -49,7 +49,9 @@ impl Drop for MibTablePtr {
     fn drop(&mut self) {
         if !self.0.is_null() {
             // Free the memory allocated by GetIpInterfaceTable.
-            unsafe { FreeMibTable(self.0.cast()) };
+            unsafe {
+                FreeMibTable(self.0.cast());
+            }
         }
     }
 }
