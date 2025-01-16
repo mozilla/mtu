@@ -27,7 +27,7 @@ mod bindings {
 
 use bindings::{
     if_indextoname, FreeMibTable, GetBestInterfaceEx, GetIpInterfaceTable, AF_INET, AF_INET6,
-    AF_UNSPEC, IF_MAX_STRING_SIZE, IN6_ADDR, IN6_ADDR_0, IN_ADDR, IN_ADDR_0, MIB_IPINTERFACE_ROW,
+    IF_MAX_STRING_SIZE, IN6_ADDR, IN6_ADDR_0, IN_ADDR, IN_ADDR_0, MIB_IPINTERFACE_ROW,
     MIB_IPINTERFACE_TABLE, NO_ERROR, SOCKADDR, SOCKADDR_IN, SOCKADDR_IN6, SOCKADDR_INET,
 };
 
@@ -109,7 +109,8 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize)> {
     // Get a list of all interfaces with associated metadata.
     let mut if_table = MibTablePtr::default();
     // GetIpInterfaceTable allocates memory, which MibTablePtr::drop will free.
-    if unsafe { GetIpInterfaceTable(AF_UNSPEC, if_table.mut_ptr_ptr()) } != NO_ERROR {
+    let family = if remote.is_ipv4() { AF_INET } else { AF_INET6 };
+    if unsafe { GetIpInterfaceTable(family, if_table.mut_ptr_ptr()) } != NO_ERROR {
         return Err(Error::last_os_error());
     }
     // Make a slice
