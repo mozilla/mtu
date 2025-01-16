@@ -91,7 +91,6 @@ fn bindgen() {
         "Windows.Win32.Foundation.NO_ERROR",
         "Windows.Win32.Networking.WinSock.AF_INET",
         "Windows.Win32.Networking.WinSock.AF_INET6",
-        "Windows.Win32.Networking.WinSock.AF_UNSPEC",
         "Windows.Win32.Networking.WinSock.SOCKADDR_INET",
         "Windows.Win32.NetworkManagement.IpHelper.FreeMibTable",
         "Windows.Win32.NetworkManagement.IpHelper.GetBestInterfaceEx",
