@@ -13,22 +13,19 @@ use std::{
 
 use crate::default_err;
 
-#[allow(
-    non_camel_case_types,
-    non_snake_case,
-    clippy::semicolon_if_nothing_returned,
-    clippy::missing_transmute_annotations,
-    clippy::upper_case_acronyms,
-    clippy::struct_field_names
-)]
-mod bindings {
-    include!(env!("BINDINGS"));
-}
-
-use bindings::{
-    if_indextoname, FreeMibTable, GetBestInterfaceEx, GetIpInterfaceTable, AF_INET, AF_INET6,
-    IF_MAX_STRING_SIZE, IN6_ADDR, IN6_ADDR_0, IN_ADDR, IN_ADDR_0, MIB_IPINTERFACE_ROW,
-    MIB_IPINTERFACE_TABLE, NO_ERROR, SOCKADDR, SOCKADDR_IN, SOCKADDR_IN6, SOCKADDR_INET,
+use windows::{
+    Win32::Foundation::NO_ERROR,
+    Win32::NetworkManagement::{
+        IpHelper::{
+            if_indextoname, FreeMibTable, GetBestInterfaceEx, GetIpInterfaceTable,
+            MIB_IPINTERFACE_ROW, MIB_IPINTERFACE_TABLE,
+        },
+        Ndis::IF_MAX_STRING_SIZE,
+    },
+    Win32::Networking::WinSock::{
+        AF_INET, AF_INET6, IN6_ADDR, IN6_ADDR_0, IN_ADDR, IN_ADDR_0, SOCKADDR, SOCKADDR_IN,
+        SOCKADDR_IN6, SOCKADDR_INET,
+    },
 };
 
 struct MibTablePtr(*mut MIB_IPINTERFACE_TABLE);

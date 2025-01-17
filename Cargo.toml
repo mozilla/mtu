@@ -27,8 +27,12 @@ static_assertions = { version = "1.1", default-features = false }
 
 [target.'cfg(windows)'.dependencies]
 # Don't increase beyond what Firefox is currently using: https://searchfox.org/mozilla-central/source/Cargo.lock
-windows-core = { version = "0.58", default-features = false }
-windows-targets = { version = "0.52", default-features = false }
+windows = { version = "0.58", features = [
+  "Win32_Foundation",
+  "Win32_NetworkManagement_IpHelper",
+  "Win32_NetworkManagement_Ndis",
+  "Win32_Networking_WinSock",
+] }
 
 [build-dependencies]
 cfg_aliases = { version = "0.2", default-features = false }
@@ -37,9 +41,6 @@ mozbuild = { version = "0.1", default-features = false, optional = true }
 [target.'cfg(not(windows))'.build-dependencies]
 # Don't increase beyond what Firefox is currently using: https://searchfox.org/mozilla-central/source/Cargo.lock
 bindgen = { version = "0.69", default-features = false, features = ["runtime"] }
-
-[target.'cfg(windows)'.build-dependencies]
-windows-bindgen = { version = "0.58", default-features = false, features = ["metadata"] }
 
 [features]
 gecko = ["dep:mozbuild"]
