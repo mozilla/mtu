@@ -11,22 +11,22 @@ use std::{
     ptr, slice,
 };
 
-use crate::default_err;
-
-use windows::{
-    Win32::Foundation::NO_ERROR,
-    Win32::NetworkManagement::{
+use windows::Win32::{
+    Foundation::NO_ERROR,
+    NetworkManagement::{
         IpHelper::{
             if_indextoname, FreeMibTable, GetBestInterfaceEx, GetIpInterfaceTable,
             MIB_IPINTERFACE_ROW, MIB_IPINTERFACE_TABLE,
         },
         Ndis::IF_MAX_STRING_SIZE,
     },
-    Win32::Networking::WinSock::{
+    Networking::WinSock::{
         AF_INET, AF_INET6, IN6_ADDR, IN6_ADDR_0, IN_ADDR, IN_ADDR_0, SOCKADDR, SOCKADDR_IN,
         SOCKADDR_IN6, SOCKADDR_INET,
     },
 };
+
+use crate::default_err;
 
 struct MibTablePtr(*mut MIB_IPINTERFACE_TABLE);
 
