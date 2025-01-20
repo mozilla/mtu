@@ -6,6 +6,7 @@
 
 #![allow(clippy::unwrap_used)] // OK in build scripts.
 
+#[cfg(not(windows))]
 const BINDINGS: &str = "bindings.rs";
 
 #[cfg(feature = "gecko")]
@@ -79,32 +80,6 @@ fn bindgen() {
     println!("cargo:rustc-env=BINDINGS={}", out_path.display());
 }
 
-#[cfg(windows)]
-fn bindgen() {
-    let out_path = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap()).join(BINDINGS);
-    windows_bindgen::bindgen([
-        "--out",
-        out_path.to_str().unwrap(),
-        "--config",
-        "flatten",
-        "no-inner-attributes",
-        "minimal",
-        "--filter",
-        "Windows.Win32.Foundation.NO_ERROR",
-        "Windows.Win32.Networking.WinSock.AF_INET",
-        "Windows.Win32.Networking.WinSock.AF_INET6",
-        "Windows.Win32.Networking.WinSock.SOCKADDR_INET",
-        "Windows.Win32.NetworkManagement.IpHelper.FreeMibTable",
-        "Windows.Win32.NetworkManagement.IpHelper.GetBestInterfaceEx",
-        "Windows.Win32.NetworkManagement.IpHelper.GetIpInterfaceTable",
-        "Windows.Win32.NetworkManagement.IpHelper.if_indextoname",
-        "Windows.Win32.NetworkManagement.IpHelper.MIB_IPINTERFACE_ROW",
-        "Windows.Win32.NetworkManagement.Ndis.IF_MAX_STRING_SIZE",
-    ])
-    .expect("Couldn't write bindings!");
-    println!("cargo:rustc-env=BINDINGS={}", out_path.display());
-}
-
 fn main() {
     // Setup cfg aliases
     cfg_aliases::cfg_aliases! {
@@ -126,5 +101,7 @@ fn main() {
             )
         }
     }
+
+    #[cfg(not(windows))]
     bindgen();
 }
