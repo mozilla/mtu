@@ -106,7 +106,7 @@ jobs:
             OPTIONS+=("$BUILD_TYPE")
           fi
           if [ "${{ matrix.rust-toolchain }}" == "nightly" ] && [ "${{ matrix.type }}" == "debug" ] && [ "${{endsWith(matrix.os, '-latest') && 'latest' || '' }}" == "latest" ]; then
-            cargo +${{ matrix.rust-toolchain }} llvm-cov test --mcdc --include-ffi "${OPTIONS[@]}" --codecov --output-path codecov.json
+            cargo +${{ matrix.rust-toolchain }} llvm-cov test "${OPTIONS[@]}" --codecov --output-path codecov.json
           else
             if [ "${{ startsWith(matrix.os, 'windows') && 'windows' || '' }}" == "windows" ]; then
               # The codegen_windows_bindings test only succeeds when run via llvm-cov?!
@@ -283,7 +283,7 @@ jobs:
             cargo check --all-targets
             cargo clippy -- -D warnings
             cargo install cargo-llvm-cov --locked
-            cargo llvm-cov test --mcdc --include-ffi --no-fail-fast --codecov --output-path codecov.json
+            cargo llvm-cov test --no-fail-fast --codecov --output-path codecov.json
             cargo test --no-fail-fast --release
             rm -rf target # Don't sync this back to host
 
@@ -306,7 +306,7 @@ jobs:
             # export LLVM_COV=/usr/local/llvm16/bin/llvm-cov
             # export LLVM_PROFDATA=/usr/local/llvm16/bin/llvm-profdata
             # cargo install cargo-llvm-cov --locked
-            # cargo llvm-cov test --mcdc --include-ffi --no-fail-fast --codecov --output-path codecov.json
+            # cargo llvm-cov test --no-fail-fast --codecov --output-path codecov.json
             cargo test --no-fail-fast # Remove this once profiler is supported
             cargo test --no-fail-fast --release
             rm -rf target # Don't sync this back to host
@@ -330,7 +330,7 @@ jobs:
             # > error[E0463]: can't find crate for `profiler_builtins`
             # > = note: the compiler may have been built without the profiler runtime
             # cargo install cargo-llvm-cov --locked
-            # cargo llvm-cov test --mcdc --include-ffi --no-fail-fast --codecov --output-path codecov.json
+            # cargo llvm-cov test --no-fail-fast --codecov --output-path codecov.json
             cargo test --no-fail-fast # Remove this once profiler is supported
             cargo test --no-fail-fast --release
             rm -rf target # Don't sync this back to host
@@ -354,7 +354,7 @@ jobs:
             # > error[E0463]: can't find crate for `profiler_builtins`
             # > = note: the compiler may have been built without the profiler runtime
             # cargo install cargo-llvm-cov --locked
-            # cargo llvm-cov test --mcdc --include-ffi --no-fail-fast --codecov --output-path codecov.json
+            # cargo llvm-cov test --no-fail-fast --codecov --output-path codecov.json
             cargo test --no-fail-fast # Remove this once profiler is supported
             cargo test --no-fail-fast --release
             rm -rf target # Don't sync this back to host
