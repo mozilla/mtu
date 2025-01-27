@@ -42,12 +42,12 @@ const fn clang_args() -> Vec<String> {
 
 #[cfg(not(windows))]
 fn bindgen() {
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     let bindings = bindgen::Builder::default()
         .header_contents("rtnetlink.h", "#include <linux/rtnetlink.h>")
         // Only generate bindings for the following types
         .allowlist_type("rtattr|rtmsg|ifinfomsg|nlmsghdr");
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(not(any(target_os = "linux", target_os = "android")))]
     let bindings = bindgen::Builder::default()
         .header_contents(
             "route.h",
