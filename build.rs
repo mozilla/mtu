@@ -6,7 +6,8 @@
 
 #![allow(clippy::unwrap_used)] // OK in build scripts.
 
-#[cfg(not(windows))]
+use std::env;
+
 const BINDINGS: &str = "bindings.rs";
 
 #[cfg(feature = "gecko")]
@@ -35,27 +36,34 @@ fn clang_args() -> Vec<String> {
     flags
 }
 
-#[cfg(not(any(feature = "gecko", target_os = "windows")))]
+#[cfg(not(feature = "gecko"))]
 const fn clang_args() -> Vec<String> {
     Vec::new()
 }
 
-#[cfg(not(windows))]
 fn bindgen() {
-    #[cfg(target_os = "linux")]
-    let bindings = bindgen::Builder::default()
-        .header_contents("rtnetlink.h", "#include <linux/rtnetlink.h>")
-        // Only generate bindings for the following types
-        .allowlist_type("rtattr|rtmsg|ifinfomsg|nlmsghdr");
-    #[cfg(not(target_os = "linux"))]
-    let bindings = bindgen::Builder::default()
+    let target_os = env::var("CARGO_CFG_TARGET_OS").expect("CARGO_CFG_TARGET_OS was not set");
+
+    if target_os == "windows" {
+        return;
+    }
+
+    let bindings = if matches!(target_os.as_str(), "linux" | "android") {
+        bindgen::Builder::default()
+            .header_contents("rtnetlink.h", "#include <linux/rtnetlink.h>")
+            // Only generate bindings for the following types
+            .allowlist_type("rtattr|rtmsg|ifinfomsg|nlmsghdr")
+    } else {
+        bindgen::Builder::default()
         .header_contents(
             "route.h",
             "#include <sys/types.h>\n#include <sys/socket.h>\n#include <net/route.h>\n#include <net/if.h>",
         )
         // Only generate bindings for the following types and items
         .allowlist_type("rt_msghdr|rt_metrics|if_data")
-        .allowlist_item("RTAX_MAX|RTM_GET|RTM_VERSION|RTA_DST|RTA_IFP");
+        .allowlist_item("RTAX_MAX|RTM_GET|RTM_VERSION|RTA_DST|RTA_IFP")
+    };
+
     let bindings = bindings
         .clang_args(clang_args())
         // Tell cargo to invalidate the built crate whenever any of the
@@ -73,7 +81,7 @@ fn bindgen() {
         .expect("Unable to generate bindings");
 
     // Write the bindings to the $OUT_DIR/$BINDINGS file.
-    let out_path = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap()).join(BINDINGS);
+    let out_path = std::path::PathBuf::from(env::var("OUT_DIR").unwrap()).join(BINDINGS);
     bindings
         .write_to_file(out_path.clone())
         .expect("Couldn't write bindings!");
@@ -102,6 +110,5 @@ fn main() {
         }
     }
 
-    #[cfg(not(windows))]
     bindgen();
 }

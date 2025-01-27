@@ -15,14 +15,14 @@ use libc::{fsync, read, socket, write, SOCK_RAW};
 
 use crate::unlikely_err;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 type AtomicRouteSocketSeq = std::sync::atomic::AtomicU32;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 type RouteSocketSeq = u32;
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(any(target_os = "linux", target_os = "android")))]
 type AtomicRouteSocketSeq = std::sync::atomic::AtomicI32;
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(any(target_os = "linux", target_os = "android")))]
 type RouteSocketSeq = i32;
 
 static SEQ: AtomicRouteSocketSeq = AtomicRouteSocketSeq::new(0);
