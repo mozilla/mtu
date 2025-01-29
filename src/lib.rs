@@ -60,7 +60,7 @@ macro_rules! asserted_const_with_type {
 #[cfg(any(apple, bsd))]
 mod bsd;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 mod linux;
 
 #[cfg(target_os = "windows")]
@@ -71,7 +71,7 @@ mod routesocket;
 
 #[cfg(any(apple, bsd))]
 use bsd::interface_and_mtu_impl;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use linux::interface_and_mtu_impl;
 #[cfg(target_os = "windows")]
 use windows::interface_and_mtu_impl;
@@ -133,7 +133,7 @@ mod test {
 
     #[cfg(any(apple, target_os = "freebsd",))]
     const LOOPBACK: &[NameMtu] = &[NameMtu(Some("lo0"), 16_384), NameMtu(Some("lo0"), 16_384)];
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     const LOOPBACK: &[NameMtu] = &[NameMtu(Some("lo"), 65_536), NameMtu(Some("lo"), 65_536)];
     #[cfg(target_os = "windows")]
     const LOOPBACK: &[NameMtu] = &[
