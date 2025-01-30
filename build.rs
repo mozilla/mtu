@@ -44,6 +44,13 @@ const fn clang_args() -> Vec<String> {
 fn bindgen() {
     let target_os = env::var("CARGO_CFG_TARGET_OS").expect("CARGO_CFG_TARGET_OS was not set");
 
+    // Platforms currently not supported.
+    //
+    // See <https://github.com/mozilla/mtu/issues/82>.
+    if matches!(target_os.as_str(), "ios" | "tvos" | "visionos") {
+        return;
+    }
+
     if target_os == "windows" {
         return;
     }
@@ -91,15 +98,6 @@ fn bindgen() {
 fn main() {
     // Setup cfg aliases
     cfg_aliases::cfg_aliases! {
-        // Platforms
-        apple: {
-            any(
-                target_os = "macos",
-                target_os = "ios",
-                target_os = "tvos",
-                target_os = "visionos"
-            )
-        },
         bsd: {
             any(
                 target_os = "freebsd",

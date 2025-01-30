@@ -57,7 +57,7 @@ macro_rules! asserted_const_with_type {
     };
 }
 
-#[cfg(any(apple, bsd))]
+#[cfg(any(target_os = "macos", bsd))]
 mod bsd;
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -69,7 +69,7 @@ mod windows;
 #[cfg(not(target_os = "windows"))]
 mod routesocket;
 
-#[cfg(any(apple, bsd))]
+#[cfg(any(target_os = "macos", bsd))]
 use bsd::interface_and_mtu_impl;
 #[cfg(any(target_os = "linux", target_os = "android"))]
 use linux::interface_and_mtu_impl;
@@ -96,6 +96,14 @@ const fn aligned_by(size: usize, align: usize) -> usize {
     } else {
         1 + ((size - 1) | (align - 1))
     }
+}
+
+// Platforms currently not supported.
+//
+// See <https://github.com/mozilla/mtu/issues/82>.
+#[cfg(any(target_os = "ios", target_os = "tvos", target_os = "visionos"))]
+pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize)> {
+    return Err(default_err());
 }
 
 /// Return the name and maximum transmission unit (MTU) of the outgoing network interface towards a
@@ -131,7 +139,7 @@ mod test {
         }
     }
 
-    #[cfg(any(apple, target_os = "freebsd",))]
+    #[cfg(any(target_os = "macos", target_os = "freebsd",))]
     const LOOPBACK: &[NameMtu] = &[NameMtu(Some("lo0"), 16_384), NameMtu(Some("lo0"), 16_384)];
     #[cfg(any(target_os = "linux", target_os = "android"))]
     const LOOPBACK: &[NameMtu] = &[NameMtu(Some("lo"), 65_536), NameMtu(Some("lo"), 65_536)];
