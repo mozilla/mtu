@@ -298,8 +298,7 @@ jobs:
           run: | # This executes as user
             set -e
             sh rustup.sh --default-toolchain nightly --profile minimal --component clippy llvm-tools -y
-            cat "$HOME/.cargo/env"
-            . "$HOME/.cargo/env"
+            export PATH="$HOME/.cargo/bin:$PATH"
             cargo check --all-targets
             cargo clippy -- -D warnings
             cargo install cargo-llvm-cov --locked
