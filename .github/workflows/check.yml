@@ -31,6 +31,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           sparse-checkout: Cargo.toml
+          persist-credentials: false
       - id: toolchains
         run: |
           msrv="$(grep rust-version Cargo.toml | tr -d '"' | cut -f3 -d\ )"
@@ -56,7 +57,7 @@ jobs:
             rust-toolchain: stable
             type: release
           # Also do some debug builds on the oldest OS versions.
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
             rust-toolchain: stable
             type: debug
           - os: macos-13
@@ -71,6 +72,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -78,6 +81,7 @@ jobs:
           sparse-checkout: |
             .github/actions/rust
           path: neqo
+          persist-credentials: false
       - uses: ./neqo/.github/actions/rust
         with:
           version: ${{ matrix.rust-toolchain }}
@@ -91,26 +95,29 @@ jobs:
           if [ "$BUILD_TYPE" ]; then
             OPTIONS+=("$BUILD_TYPE")
           fi
-          cargo +${{ matrix.rust-toolchain }} check "${OPTIONS[@]}"
+          cargo check "${OPTIONS[@]}"
 
       - name: Run tests and determine coverage
         env:
           RUST_LOG: trace
+          TOOLCHAIN: ${{ matrix.rust-toolchain }}
+          LATEST: ${{endsWith(matrix.os, '-latest') && 'latest' || '' }}
+          WINDOWS: ${{ startsWith(matrix.os, 'windows') && 'windows' || '' }}"
         run: |
           OPTIONS=(--no-fail-fast)
           if [ "$BUILD_TYPE" ]; then
             OPTIONS+=("$BUILD_TYPE")
           fi
-          if [ "${{ matrix.rust-toolchain }}" == "nightly" ] && [ "${{ matrix.type }}" == "debug" ] && [ "${{endsWith(matrix.os, '-latest') && 'latest' || '' }}" == "latest" ]; then
-            cargo +${{ matrix.rust-toolchain }} llvm-cov test --mcdc --include-ffi "${OPTIONS[@]}" --codecov --output-path codecov.json
+          if [ "$TOOLCHAIN" == "nightly" ] && [ "${{ matrix.type }}" == "debug" ] && [ "$LATEST" == "latest" ]; then
+            cargo llvm-cov test --mcdc --include-ffi "${OPTIONS[@]}" --codecov --output-path codecov.json
           else
-            if [ "${{ startsWith(matrix.os, 'windows') && 'windows' || '' }}" == "windows" ]; then
+            if [ "$WINDOWS" == "windows" ]; then
               # The codegen_windows_bindings test only succeeds when run via llvm-cov?!
               OPTIONS+=(-- --skip codegen_windows_bindings)
             fi
-            cargo +${{ matrix.rust-toolchain }} test "${OPTIONS[@]}"
+            cargo test "${OPTIONS[@]}"
           fi
-          cargo +${{ matrix.rust-toolchain }} bench --no-run
+          cargo bench --no-run
 
       - uses: codecov/codecov-action@13ce06bfc6bbe3ecf90edbbf1bc32fe5978ca1d3 # v5.3.1
         with:
@@ -161,12 +168,15 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: mozilla/neqo
           sparse-checkout: |
             .github/actions/rust
           path: neqo
+          persist-credentials: false
       - uses: ./neqo/.github/actions/rust
         with:
           components: clippy
@@ -182,12 +192,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: mozilla/neqo
           sparse-checkout: |
             .github/actions/rust
           path: neqo
+          persist-credentials: false
       - uses: ./neqo/.github/actions/rust
         with:
           tools: cargo-machete
@@ -200,12 +213,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: mozilla/neqo
           sparse-checkout: |
             .github/actions/rust
           path: neqo
+          persist-credentials: false
       - uses: ./neqo/.github/actions/rust
         with:
           version: nightly
@@ -218,12 +234,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: mozilla/neqo
           sparse-checkout: |
             .github/actions/rust
           path: neqo
+          persist-credentials: false
       - uses: ./neqo/.github/actions/rust
         with:
           tools: cargo-semver-checks
@@ -235,12 +254,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: mozilla/neqo
           sparse-checkout: |
             .github/actions/rust
           path: neqo
+          persist-credentials: false
       - uses: ./neqo/.github/actions/rust
         with:
           tools: cargo-readme
@@ -261,10 +283,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
       - run: curl -o rustup.sh --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs
 
       - if: matrix.os == 'freebsd'
-        uses: vmactions/freebsd-vm@848dac7e118679d08e2c2f9d42cd96608d834323
+        uses: vmactions/freebsd-vm@848dac7e118679d08e2c2f9d42cd96608d834323 # v1.1.8
         with:
           usesh: true
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE RUST_LOG GITHUB_ACTIONS"
@@ -283,7 +307,7 @@ jobs:
             rm -rf target # Don't sync this back to host
 
       - if: matrix.os == 'openbsd'
-        uses: vmactions/openbsd-vm@7ac70b6de6f33efc74a90c1964afa3bcf0ee4401
+        uses: vmactions/openbsd-vm@7ac70b6de6f33efc74a90c1964afa3bcf0ee4401 # v1.1.6
         with:
           usesh: true
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE RUST_LOG GITHUB_ACTIONS"
@@ -307,7 +331,7 @@ jobs:
             rm -rf target # Don't sync this back to host
 
       - if: matrix.os == 'netbsd'
-        uses: vmactions/netbsd-vm@46a58bbf03682b4cb24142b97fa315ae52bed573
+        uses: vmactions/netbsd-vm@46a58bbf03682b4cb24142b97fa315ae52bed573 # v1.1.8
         with:
           usesh: true
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE RUST_LOG GITHUB_ACTIONS"
@@ -331,7 +355,7 @@ jobs:
             rm -rf target # Don't sync this back to host
 
       - if: matrix.os == 'solaris'
-        uses: vmactions/solaris-vm@cc8f82fa1a7cc746153ec3f71bf11f311f16e225
+        uses: vmactions/solaris-vm@cc8f82fa1a7cc746153ec3f71bf11f311f16e225 # v1.1.1
         with:
           release: "11.4-gcc"
           usesh: true
@@ -368,12 +392,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: mozilla/neqo
           sparse-checkout: |
             .github/actions/rust
           path: neqo
+          persist-credentials: false
       - uses: ./neqo/.github/actions/rust
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
