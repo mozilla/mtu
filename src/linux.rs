@@ -22,9 +22,11 @@ use static_assertions::{const_assert, const_assert_eq};
 use crate::{aligned_by, default_err, routesocket::RouteSocket, unlikely_err};
 
 #[allow(
+    clippy::allow_attributes,
     clippy::struct_field_names,
     non_camel_case_types,
-    clippy::too_many_lines
+    clippy::too_many_lines,
+    reason = "Bindgen-generated code"
 )]
 mod bindings {
     include!(env!("BINDINGS"));
@@ -93,8 +95,10 @@ struct IfIndexMsg {
 impl IfIndexMsg {
     fn new(remote: IpAddr, nlmsg_seq: u32) -> Self {
         let addr = AddrBytes::new(remote);
-        #[allow(clippy::cast_possible_truncation)]
-        // Structs lens are <= u8::MAX per `const_assert!`s above; `addr_bytes` is max. 16 for IPv6.
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "Structs lens are <= u8::MAX per `const_assert!`s above; `addr_bytes` is max. 16 for IPv6."
+        )]
         let nlmsg_len = (std::mem::size_of::<nlmsghdr>()
             + std::mem::size_of::<rtmsg>()
             + std::mem::size_of::<rtattr>()
@@ -122,8 +126,10 @@ impl IfIndexMsg {
                 ..Default::default()
             },
             rt: rtattr {
-                #[allow(clippy::cast_possible_truncation)]
-                // Structs len is <= u8::MAX per `const_assert!` above; `addr_bytes` is max. 16 for IPv6.
+                #[expect(
+                    clippy::cast_possible_truncation,
+                    reason = "Structs len is <= u8::MAX per `const_assert!` above; `addr_bytes` is max. 16 for IPv6."
+                )]
                 rta_len: (std::mem::size_of::<rtattr>() + addr.len()) as u16,
                 rta_type: RTA_DST,
             },
@@ -269,8 +275,10 @@ struct IfInfoMsg {
 
 impl IfInfoMsg {
     fn new(if_index: i32, nlmsg_seq: u32) -> Self {
-        #[allow(clippy::cast_possible_truncation)]
-        // Structs lens are <= u8::MAX per `const_assert!`s above.
+        #[epxect(
+            clippy::cast_possible_truncation,
+            reason = "Structs lens are <= u8::MAX per `const_assert!`s above."
+        )]
         let nlmsg_len = (std::mem::size_of::<nlmsghdr>() + std::mem::size_of::<ifinfomsg>()) as u32;
         Self {
             nlmsg: nlmsghdr {
