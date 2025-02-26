@@ -21,11 +21,13 @@ use libc::{
 use static_assertions::{const_assert, const_assert_eq};
 
 #[allow(
+    clippy::allow_attributes,
     non_camel_case_types,
     clippy::struct_field_names,
-    clippy::too_many_lines,
     clippy::cognitive_complexity,
-    dead_code // RTA_IFP is only used on NetBSD and Solaris
+    clippy::too_many_lines,
+    dead_code, // RTA_IFP is only used on NetBSD and Solaris
+    reason = "Bindgen-generated code"
 )]
 mod bindings {
     include!(env!("BINDINGS"));
@@ -42,7 +44,7 @@ use crate::{
 };
 
 #[cfg(target_os = "macos")]
-const ALIGN: usize = std::mem::size_of::<libc::c_int>();
+const ALIGN: usize = size_of::<libc::c_int>();
 
 #[cfg(bsd)]
 // See https://github.com/freebsd/freebsd-src/blob/524a425d30fce3d5e47614db796046830b1f6a83/sys/net/route.h#L362-L371
@@ -68,9 +70,9 @@ asserted_const_with_type!(AF_LINK, AddressFamily, libc::AF_LINK, i32);
 asserted_const_with_type!(RTM_VERSION, u8, bindings::RTM_VERSION, u32);
 asserted_const_with_type!(RTM_GET, u8, bindings::RTM_GET, u32);
 
-const_assert!(std::mem::size_of::<sockaddr_in>() + ALIGN <= u8::MAX as usize);
-const_assert!(std::mem::size_of::<sockaddr_in6>() + ALIGN <= u8::MAX as usize);
-const_assert!(std::mem::size_of::<rt_msghdr>() <= u8::MAX as usize);
+const_assert!(size_of::<sockaddr_in>() + ALIGN <= u8::MAX as usize);
+const_assert!(size_of::<sockaddr_in6>() + ALIGN <= u8::MAX as usize);
+const_assert!(size_of::<rt_msghdr>() <= u8::MAX as usize);
 
 struct IfAddrs(*mut ifaddrs);
 
@@ -183,8 +185,8 @@ union SockaddrStorage {
 
 fn sockaddr_len(af: AddressFamily) -> Result<usize> {
     let sa_len = match af {
-        AF_INET => std::mem::size_of::<sockaddr_in>(),
-        AF_INET6 => std::mem::size_of::<sockaddr_in6>(),
+        AF_INET => size_of::<sockaddr_in>(),
+        AF_INET6 => size_of::<sockaddr_in6>(),
         _ => {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
@@ -200,33 +202,37 @@ impl From<IpAddr> for SockaddrStorage {
         match ip {
             IpAddr::V4(ip) => SockaddrStorage {
                 sin: sockaddr_in {
-                #[cfg(not(target_os = "solaris"))]
-                #[allow(clippy::cast_possible_truncation)]
-                // `sockaddr_in` len is <= u8::MAX per `const_assert!` above.
-                sin_len: std::mem::size_of::<sockaddr_in>() as u8,
-                sin_family: AF_INET,
-                sin_addr: in_addr {
-                    s_addr: u32::from_ne_bytes(ip.octets()),
+                    #[cfg(not(target_os = "solaris"))]
+                    #[expect(
+                        clippy::cast_possible_truncation,
+                        reason = "`sockaddr_in` len is <= u8::MAX per `const_assert!` above."
+                    )]
+                    sin_len: size_of::<sockaddr_in>() as u8,
+                    sin_family: AF_INET,
+                    sin_addr: in_addr {
+                        s_addr: u32::from_ne_bytes(ip.octets()),
+                    },
+                    sin_port: 0,
+                    sin_zero: [0; 8],
                 },
-                sin_port: 0,
-                sin_zero: [0; 8],
-            },
             },
             IpAddr::V6(ip) => SockaddrStorage {
                 sin6: sockaddr_in6 {
-                #[cfg(not(target_os = "solaris"))]
-                #[allow(clippy::cast_possible_truncation)]
-                // `sockaddr_in6` len is <= u8::MAX per `const_assert!` above.
-                sin6_len: std::mem::size_of::<sockaddr_in6>() as u8,
-                sin6_family: AF_INET6,
-                sin6_addr: in6_addr {
-                    s6_addr: ip.octets(),
-                },
-                sin6_port: 0,
-                sin6_flowinfo: 0,
-                sin6_scope_id: 0,
-                #[cfg(target_os = "solaris")]
-                __sin6_src_id: 0,
+                    #[cfg(not(target_os = "solaris"))]
+                    #[expect(
+                        clippy::cast_possible_truncation,
+                        reason = "`sockaddr_in6` len is <= u8::MAX per `const_assert!` above."
+                    )]
+                    sin6_len: size_of::<sockaddr_in6>() as u8,
+                    sin6_family: AF_INET6,
+                    sin6_addr: in6_addr {
+                        s6_addr: ip.octets(),
+                    },
+                    sin6_port: 0,
+                    sin6_flowinfo: 0,
+                    sin6_scope_id: 0,
+                    #[cfg(target_os = "solaris")]
+                    __sin6_src_id: 0,
                 },
             },
         }
@@ -248,9 +254,11 @@ impl RouteMessage {
         })?;
         Ok(Self {
             rtm: rt_msghdr {
-                #[allow(clippy::cast_possible_truncation)]
-                // `rt_msghdr` len + `ALIGN` is <= u8::MAX per `const_assert!` above.
-                rtm_msglen: (std::mem::size_of::<rt_msghdr>() + sa_len) as u16,
+                #[expect(
+                    clippy::cast_possible_truncation,
+                    reason = "`rt_msghdr` len + `ALIGN` is <= u8::MAX per `const_assert!` above."
+                )]
+                rtm_msglen: (size_of::<rt_msghdr>() + sa_len) as u16,
                 rtm_version: RTM_VERSION,
                 rtm_type: RTM_GET,
                 rtm_seq: seq,
@@ -276,14 +284,14 @@ impl RouteMessage {
 
 impl From<&RouteMessage> for &[u8] {
     fn from(value: &RouteMessage) -> Self {
-        debug_assert!(value.len() >= std::mem::size_of::<Self>());
+        debug_assert!(value.len() >= size_of::<Self>());
         unsafe { slice::from_raw_parts(ptr::from_ref(value).cast(), value.len()) }
     }
 }
 
 impl From<&[u8]> for rt_msghdr {
     fn from(value: &[u8]) -> Self {
-        debug_assert!(value.len() >= std::mem::size_of::<Self>());
+        debug_assert!(value.len() >= size_of::<Self>());
         unsafe { ptr::read_unaligned(value.as_ptr().cast()) }
     }
 }
@@ -304,15 +312,15 @@ fn if_index_mtu(remote: IpAddr) -> Result<(u16, Option<usize>)> {
     loop {
         let mut buf = vec![
             0u8;
-            std::mem::size_of::<rt_msghdr>() +
+            size_of::<rt_msghdr>() +
         // There will never be `RTAX_MAX` sockaddrs attached, but it's a safe upper bound.
-         (RTAX_MAX as usize * std::mem::size_of::<sockaddr_storage>())
+         (RTAX_MAX as usize * size_of::<sockaddr_storage>())
         ];
         let len = fd.read(&mut buf[..])?;
-        if len < std::mem::size_of::<rt_msghdr>() {
+        if len < size_of::<rt_msghdr>() {
             return Err(default_err());
         }
-        let (reply, mut sa) = buf.split_at(std::mem::size_of::<rt_msghdr>());
+        let (reply, mut sa) = buf.split_at(size_of::<rt_msghdr>());
         let reply: rt_msghdr = reply.into();
         if !(reply.rtm_version == query_version
             && reply.rtm_pid == pid
