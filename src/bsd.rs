@@ -23,9 +23,10 @@ use static_assertions::{const_assert, const_assert_eq};
 #[allow(
     clippy::allow_attributes,
     non_camel_case_types,
+    non_snake_case,
     clippy::struct_field_names,
-    clippy::cognitive_complexity,
     clippy::too_many_lines,
+    clippy::cognitive_complexity,
     dead_code, // RTA_IFP is only used on NetBSD and Solaris
     reason = "Bindgen-generated code"
 )]
@@ -50,7 +51,7 @@ const ALIGN: usize = size_of::<libc::c_int>();
 // See https://github.com/freebsd/freebsd-src/blob/524a425d30fce3d5e47614db796046830b1f6a83/sys/net/route.h#L362-L371
 // See https://github.com/NetBSD/src/blob/4b50954e98313db58d189dd87b4541929efccb09/sys/net/route.h#L329-L331
 // See https://github.com/Arquivotheca/Solaris-8/blob/2ad1d32f9eeed787c5adb07eb32544276e2e2444/osnet_volume/usr/src/cmd/cmd-inet/usr.sbin/route.c#L238-L239
-const ALIGN: usize = std::mem::size_of::<libc::c_long>();
+const ALIGN: usize = size_of::<libc::c_long>();
 
 #[cfg(any(target_os = "macos", target_os = "freebsd", target_os = "openbsd"))]
 asserted_const_with_type!(RTM_ADDRS, i32, RTA_DST, u32);
