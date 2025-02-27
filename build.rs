@@ -12,16 +12,9 @@ const BINDINGS: &str = "bindings.rs";
 
 #[cfg(feature = "gecko")]
 fn clang_args() -> Vec<String> {
-    use mozbuild::TOPOBJDIR;
+    use mozbuild::{config::BINDGEN_SYSTEM_FLAGS, TOPOBJDIR};
 
-    let flags_path = TOPOBJDIR.join("netwerk/socket/neqo/extra-bindgen-flags");
-    println!("cargo:rerun-if-changed={}", flags_path.to_str().unwrap());
-
-    let mut flags: Vec<String> = std::fs::read_to_string(flags_path)
-        .expect("Failed to read extra-bindgen-flags file")
-        .split_whitespace()
-        .map(std::borrow::ToOwned::to_owned)
-        .collect();
+    let mut flags: Vec<String> = BINDGEN_SYSTEM_FLAGS.iter().map(|s| s.to_string()).collect();
 
     flags.push(String::from("-include"));
     flags.push(
