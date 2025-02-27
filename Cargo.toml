@@ -21,13 +21,11 @@ is-it-maintained-open-issues = { repository = "mozilla/mtu", branch = "main" }
 maintenance = { status = "actively-developed", branch = "main" }
 
 [dependencies]
-# Don't increase beyond what Firefox is currently using: https://searchfox.org/mozilla-central/source/Cargo.lock
-libc = { version = "0.2", default-features = false }
-static_assertions = { version = "1.1", default-features = false }
+libc = { version = "0", default-features = false }
+static_assertions = { version = "1", default-features = false }
 
 [target.'cfg(windows)'.dependencies]
-# Don't increase beyond what Firefox is currently using: https://searchfox.org/mozilla-central/source/Cargo.lock
-windows = { version = ">=0.58,<0.60", features = [
+windows = { version = "0", features = [
   "Win32_Foundation",
   "Win32_NetworkManagement_IpHelper",
   "Win32_NetworkManagement_Ndis",
@@ -35,10 +33,9 @@ windows = { version = ">=0.58,<0.60", features = [
 ] }
 
 [build-dependencies]
-cfg_aliases = { version = "0.2", default-features = false }
-mozbuild = { version = "0.1", default-features = false, optional = true }
-# Don't increase beyond what Firefox is currently using: https://searchfox.org/mozilla-central/source/Cargo.lock
-bindgen = { version = "0.69", default-features = false, features = ["runtime"] }
+cfg_aliases = { version = "0", default-features = false }
+mozbuild = { version = "0", default-features = false, optional = true }
+bindgen = { version = "0", default-features = false, features = ["runtime"] }
 
 [features]
 gecko = ["dep:mozbuild"]
