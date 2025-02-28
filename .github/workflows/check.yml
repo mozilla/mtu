@@ -316,8 +316,8 @@ jobs:
             pkg_add rust rust-clippy llvm-16.0.6p30 sudo-1.9.15.5p0 # rustup doesn't support OpenBSD at all
             curl -o build-rust.sh -sSf https://raw.githubusercontent.com/semarie/build-rust/refs/heads/master/build.sh
             echo "SUDO=sudo" > ~/.build_rust.conf
-            sh -x build-rust.sh init
-            sh -x build-rust.sh nightly
+            sh -x /root/build-rust.sh init
+            sh -x /root/build-rust.sh nightly
             pwd
             ls -la
           run: | # This executes as user
