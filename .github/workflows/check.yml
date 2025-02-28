@@ -313,6 +313,8 @@ jobs:
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE RUST_LOG GITHUB_ACTIONS"
           prepare: | # This executes as root
             set -e
+            df -h
+            du -sh /*
             pkg_add rust rust-clippy llvm-16.0.6p30 sudo-1.9.15.5p0 # rustup doesn't support OpenBSD at all
             curl -o /root/build-rust.sh -sSf https://raw.githubusercontent.com/semarie/build-rust/refs/heads/master/build.sh
             echo "SUDO=sudo" > ~/.build_rust.conf
