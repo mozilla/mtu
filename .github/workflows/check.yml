@@ -314,19 +314,21 @@ jobs:
           prepare: | # This executes as root
             set -e
             pkg_add rust rust-clippy llvm-16.0.6p30 # rustup doesn't support OpenBSD at all
+            curl -o build-rust.sh -sSf https://raw.githubusercontent.com/semarie/build-rust/refs/heads/master/build.sh
+            echo "SUDO=doas" > ~/.build_rust.conf
+            sh build-rust.sh init
+            sh build-rust.sh nightly
+            pwd
+            ls -l
           run: | # This executes as user
             set -e
             export LIBCLANG_PATH=/usr/local/llvm16/lib
             cargo check --all-targets
             cargo clippy -- -D warnings
-            # FIXME: No profiler support in openbsd currently, error is:
-            # > error[E0463]: can't find crate for `profiler_builtins`
-            # > = note: the compiler may have been built without the profiler runtime
             # export LLVM_COV=/usr/local/llvm16/bin/llvm-cov
             # export LLVM_PROFDATA=/usr/local/llvm16/bin/llvm-profdata
-            # cargo install cargo-llvm-cov --locked
-            # cargo llvm-cov test --mcdc --include-ffi --no-fail-fast --codecov --output-path codecov.json
-            cargo test --no-fail-fast # Remove this once profiler is supported
+            cargo install cargo-llvm-cov --locked
+            cargo -Z build-std llvm-cov test --mcdc --include-ffi --no-fail-fast --codecov --output-path codecov.json
             cargo test --no-fail-fast --release
             rm -rf target # Don't sync this back to host
 
@@ -345,12 +347,8 @@ jobs:
             . "$HOME/.cargo/env"
             cargo check --all-targets
             cargo clippy -- -D warnings
-            # FIXME: No profiler support in netbsd currently, error is:
-            # > error[E0463]: can't find crate for `profiler_builtins`
-            # > = note: the compiler may have been built without the profiler runtime
-            # cargo install cargo-llvm-cov --locked
-            # cargo llvm-cov test --mcdc --include-ffi --no-fail-fast --codecov --output-path codecov.json
-            cargo test --no-fail-fast # Remove this once profiler is supported
+            cargo install cargo-llvm-cov --locked
+            cargo -Z build-std llvm-cov test --mcdc --include-ffi --no-fail-fast --codecov --output-path codecov.json
             cargo test --no-fail-fast --release
             rm -rf target # Don't sync this back to host
 
@@ -369,12 +367,8 @@ jobs:
             export LIBCLANG_PATH="/usr/lib/amd64"
             cargo check --all-targets
             cargo clippy -- -D warnings
-            # FIXME: No profiler support in openbsd currently, error is:
-            # > error[E0463]: can't find crate for `profiler_builtins`
-            # > = note: the compiler may have been built without the profiler runtime
-            # cargo install cargo-llvm-cov --locked
-            # cargo llvm-cov test --mcdc --include-ffi --no-fail-fast --codecov --output-path codecov.json
-            cargo test --no-fail-fast # Remove this once profiler is supported
+            cargo install cargo-llvm-cov --locked
+            cargo -Z build-std llvm-cov test --mcdc --include-ffi --no-fail-fast --codecov --output-path codecov.json
             cargo test --no-fail-fast --release
             rm -rf target # Don't sync this back to host
 
