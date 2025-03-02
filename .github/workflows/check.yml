@@ -464,6 +464,7 @@ jobs:
           while [ -z "$(adb shell getprop sys.boot_completed | tr -d '\r')" ]; do sleep 1; done
           any_failures=0
           find target/$TARGET -ls
+          find target/$TARGET/debug/deps/ -type f -executable ! -name "*.so" -name "*-*"
           for test in $(find target/$TARGET/debug/deps/ -type f -executable ! -name "*.so" -name "*-*"); do
               adb push "$test" /data/local/tmp/
               adb shell chmod +x /data/local/tmp/$(basename "$test")
