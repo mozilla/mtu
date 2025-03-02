@@ -6,7 +6,7 @@
 
 #![allow(clippy::unwrap_used)] // OK in build scripts.
 
-use std::env;
+use std::{env, fs};
 
 const BINDINGS: &str = "bindings.rs";
 
@@ -86,6 +86,8 @@ fn bindgen() {
         .write_to_file(out_path.clone())
         .expect("Couldn't write bindings!");
     println!("cargo:rustc-env=BINDINGS={}", out_path.display());
+    let c = fs::read_to_string(out_path).unwrap();
+    eprintln!("bindings.rs: {c}");
 }
 
 fn main() {
