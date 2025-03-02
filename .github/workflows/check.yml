@@ -441,8 +441,8 @@ jobs:
         token: ${{ secrets.GITHUB_TOKEN }}
 
     - run: |
-        echo "RUSTFLAGS=''" >> $GITHUB_ENV
-        export RUSTFLAGS=""
+        # echo "RUSTFLAGS=''" >> "$GITHUB_ENV"
+        # export RUSTFLAGS=""
         cargo -vv ndk -t ${{ matrix.target }} test --no-run
 
     - name: Enable KVM group perms

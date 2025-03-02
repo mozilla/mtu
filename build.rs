@@ -6,7 +6,7 @@
 
 #![allow(clippy::unwrap_used)] // OK in build scripts.
 
-use std::{env, fs};
+use std::env;
 
 const BINDINGS: &str = "bindings.rs";
 
@@ -48,6 +48,11 @@ fn bindgen() {
         return;
     }
 
+    if target_os.as_str().ends_with("android") {
+        env::var("BINDGEN_EXTRA_CLANG_ARGS")
+            .expect("Need to set BINDGEN_EXTRA_CLANG_ARGS=--sysroot=/path/to/your/ndk/sysroot");
+    }
+
     let bindings = if matches!(target_os.as_str(), "linux" | "android") {
         bindgen::Builder::default()
             .header_contents("rtnetlink.h", "#include <linux/rtnetlink.h>")
@@ -86,8 +91,6 @@ fn bindgen() {
         .write_to_file(out_path.clone())
         .expect("Couldn't write bindings!");
     println!("cargo:rustc-env=BINDINGS={}", out_path.display());
-    let c = fs::read_to_string(out_path).unwrap();
-    eprintln!("bindings.rs: {c}");
 }
 
 fn main() {
