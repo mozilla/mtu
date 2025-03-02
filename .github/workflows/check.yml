@@ -440,7 +440,9 @@ jobs:
         tools: cargo-ndk
         token: ${{ secrets.GITHUB_TOKEN }}
 
-    - run: cargo -vv ndk -t ${{ matrix.target }} test --no-run
+    - run: |
+        cargo clean
+        cargo -vv ndk -t ${{ matrix.target }} test --no-run
 
     - name: Enable KVM group perms
       run: |

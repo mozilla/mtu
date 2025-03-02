@@ -36,7 +36,7 @@ const fn clang_args() -> Vec<String> {
 
 fn bindgen() {
     let target_os = env::var("CARGO_CFG_TARGET_OS").expect("CARGO_CFG_TARGET_OS was not set");
-    eprintln!("target_os: {target_os}");
+
     // Platforms currently not supported.
     //
     // See <https://github.com/mozilla/mtu/issues/82>.
