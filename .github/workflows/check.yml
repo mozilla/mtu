@@ -426,7 +426,14 @@ jobs:
       with:
         persist-credentials: false
 
-    - uses: ./.github/actions/rust
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      with:
+        repository: mozilla/neqo
+        sparse-checkout: |
+          .github/actions/rust
+        path: neqo
+        persist-credentials: false
+    - uses: ./neqo/.github/actions/rust
       with:
         version: stable
         targets: ${{ matrix.target }}
