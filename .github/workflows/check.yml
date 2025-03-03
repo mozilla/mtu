@@ -463,8 +463,7 @@ jobs:
           adb wait-for-device
           while [ -z "$(adb shell getprop sys.boot_completed | tr -d '\r')" ]; do sleep 1; done
           any_failures=0
-          find target/$TARGET/debug/deps/ -type f -executable ! -name "*.so" -name "*-*" | \
-          while IFS= read -r test; do
+          find target/$TARGET/debug/deps/ -type f -executable ! -name "*.so" -name "*-*" | while IFS= read -r test; do
             echo "Running $test on emulator..."
             adb push "$test" /data/local/tmp/
             adb shell chmod +x /data/local/tmp/$(basename "$test")
