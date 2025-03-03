@@ -440,33 +440,35 @@ jobs:
         tools: cargo-ndk
         token: ${{ secrets.GITHUB_TOKEN }}
 
-    - env:
-        TARGET: ${{ matrix.target }}
-      run: |
-        echo "TARGET=$TARGET" >> "$GITHUB_ENV"
+    - run: |
         # FIXME: Remove resetting RUSTFLAGS once Android support for neqo has landed.
         echo "RUSTFLAGS=''" >> "$GITHUB_ENV"
         export RUSTFLAGS=""
         cargo -vv ndk -t ${{ matrix.target }} test --no-run
 
-    - name: Enable KVM group perms
+    - env:
+        TARGET: ${{ matrix.target }}
       run: |
         echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
         sudo udevadm control --reload-rules
         sudo udevadm trigger --name-match=kvm
+        echo "TARGET=$TARGET" >> "$GITHUB_ENV"
+        cat <<'EOF' > rust-android-run-tests-on-emulator.sh
+        #!/bin/bash
+        set -e
+        adb wait-for-device
+        while [ -z "$(adb shell getprop sys.boot_completed | tr -d '\r')" ]; do sleep 1; done
+        any_failures=0
+        for test in $(find target/$TARGET/debug/deps/ -type f -executable ! -name "*.so" -name "*-*"); do
+          adb push "$test" /data/local/tmp/
+          adb shell chmod +x /data/local/tmp/$(basename "$test")
+          adb shell API_LEVEL=$API_LEVEL /data/local/tmp/$(basename "$test") || any_failures=1
+        done
+        exit $any_failures
+        EOF
 
     - uses: reactivecircus/android-emulator-runner@62dbb605bba737720e10b196cb4220d374026a6d # v2.33.0
       with:
         api-level: ${{ matrix.api-level }}
         arch: ${{ matrix.emulator-arch }}
-        script: |
-          adb wait-for-device
-          while [ -z "$(adb shell getprop sys.boot_completed | tr -d '\r')" ]; do sleep 1; done
-          any_failures=0
-          find target/$TARGET/debug/deps/ -type f -executable ! -name "*.so" -name "*-*" | while IFS= read -r test; do
-            echo "Running $test on emulator..."
-            adb push "$test" /data/local/tmp/
-            adb shell chmod +x /data/local/tmp/$(basename "$test")
-            adb shell API_LEVEL=$API_LEVEL /data/local/tmp/$(basename "$test") || any_failures=1
-          done
-          exit $any_failures
+        script: rust-android-run-tests-on-emulator.sh
