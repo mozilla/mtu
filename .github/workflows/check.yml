@@ -291,6 +291,7 @@ jobs:
         uses: vmactions/freebsd-vm@848dac7e118679d08e2c2f9d42cd96608d834323 # v1.1.8
         with:
           usesh: true
+          sync: nfs
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE RUST_LOG GITHUB_ACTIONS"
           prepare: | # This executes as root
             set -e
@@ -304,27 +305,23 @@ jobs:
             cargo install cargo-llvm-cov --locked
             cargo llvm-cov test --mcdc --include-ffi --no-fail-fast --codecov --output-path codecov.json
             cargo test --no-fail-fast --release
-            rm -rf target # Don't sync this back to host
 
       - if: matrix.os == 'openbsd'
         uses: vmactions/openbsd-vm@7ac70b6de6f33efc74a90c1964afa3bcf0ee4401 # v1.1.6
         with:
           usesh: true
+          sync: nfs
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE RUST_LOG GITHUB_ACTIONS"
           prepare: | # This executes as root
             set -e
-            df -h
-            du -sh /*
             pkg_add rust rust-clippy llvm-16.0.6p30 sudo-1.9.15.5p0 # rustup doesn't support OpenBSD at all
+          run: | # This executes as user
+            set -e
             curl -o /root/build-rust.sh -sSf https://raw.githubusercontent.com/semarie/build-rust/refs/heads/master/build.sh
             echo "SUDO=sudo" > ~/.build_rust.conf
             chmod a+x /root/build-rust.sh
             sh -x /root/build-rust.sh init
             sh -x /root/build-rust.sh nightly
-            pwd
-            ls -la
-          run: | # This executes as user
-            set -e
             export LIBCLANG_PATH=/usr/local/llvm16/lib
             cargo check --all-targets
             cargo clippy -- -D warnings
@@ -333,12 +330,12 @@ jobs:
             cargo install cargo-llvm-cov --locked
             cargo -Z build-std llvm-cov test --mcdc --include-ffi --no-fail-fast --codecov --output-path codecov.json
             cargo test --no-fail-fast --release
-            rm -rf target # Don't sync this back to host
 
       - if: matrix.os == 'netbsd'
         uses: vmactions/netbsd-vm@46a58bbf03682b4cb24142b97fa315ae52bed573 # v1.1.8
         with:
           usesh: true
+          sync: nfs
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE RUST_LOG GITHUB_ACTIONS"
           prepare: | # This executes as root
             set -e
@@ -353,13 +350,13 @@ jobs:
             cargo install cargo-llvm-cov --locked
             cargo -Z build-std llvm-cov test --mcdc --include-ffi --no-fail-fast --codecov --output-path codecov.json
             cargo test --no-fail-fast --release
-            rm -rf target # Don't sync this back to host
 
       - if: matrix.os == 'solaris'
         uses: vmactions/solaris-vm@cc8f82fa1a7cc746153ec3f71bf11f311f16e225 # v1.1.1
         with:
           release: "11.4-gcc"
           usesh: true
+          sync: nfs
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE RUST_LOG GITHUB_ACTIONS"
           prepare: | # This executes as root
             set -e
@@ -373,7 +370,6 @@ jobs:
             cargo install cargo-llvm-cov --locked
             cargo -Z build-std llvm-cov test --mcdc --include-ffi --no-fail-fast --codecov --output-path codecov.json
             cargo test --no-fail-fast --release
-            rm -rf target # Don't sync this back to host
 
       - uses: codecov/codecov-action@0565863a31f2c772f9f0395002a31e3f06189574 # v5.4.0
         with:
