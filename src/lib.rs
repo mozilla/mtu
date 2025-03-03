@@ -14,6 +14,7 @@
 //! of the outgoing network interface towards a remote destination identified by an `IpAddr`.
 //!
 //! # Example
+//!
 //! ```
 //! # use std::net::{IpAddr, Ipv4Addr};
 //! let destination = IpAddr::V4(Ipv4Addr::LOCALHOST);
@@ -24,6 +25,7 @@
 //! # Supported Platforms
 //!
 //! * Linux
+//! * Android
 //! * macOS
 //! * Windows
 //! * FreeBSD
