@@ -4,7 +4,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-#![allow(clippy::unwrap_used)] // OK in build scripts.
+#![expect(clippy::unwrap_used, reason = "OK in build scripts.")]
 
 use std::env;
 

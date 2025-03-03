@@ -53,7 +53,12 @@ use std::{
 #[cfg(not(target_os = "windows"))]
 macro_rules! asserted_const_with_type {
     ($name:ident, $t1:ty, $e:expr, $t2:ty) => {
-        #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)] // Guarded by the following `const_assert_eq!`.
+        #[allow(
+            clippy::allow_attributes,
+            clippy::cast_possible_truncation,
+            clippy::cast_possible_wrap,
+            reason = "Guarded by the following `const_assert_eq!`."
+        )]
         const $name: $t1 = $e as $t1;
         const_assert_eq!($name as $t2, $e);
     };
@@ -87,7 +92,7 @@ fn default_err() -> Error {
 #[cfg(not(target_os = "windows"))]
 fn unlikely_err(msg: String) -> Error {
     debug_assert!(false, "{msg}");
-    Error::new(ErrorKind::Other, msg)
+    Error::other(msg)
 }
 
 /// Align `size` to the next multiple of `align` (which needs to be a power of two).
@@ -137,7 +142,7 @@ mod test {
 
     impl PartialEq<NameMtu<'_>> for (String, usize) {
         fn eq(&self, other: &NameMtu<'_>) -> bool {
-            other.0.map_or(true, |name| name == self.0) && other.1 == self.1
+            other.0.is_none_or(|name| name == self.0) && other.1 == self.1
         }
     }
 
