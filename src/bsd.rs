@@ -168,7 +168,7 @@ fn if_name_mtu(idx: u32) -> Result<(String, Option<usize>)> {
     let name = unsafe {
         CStr::from_ptr(name.as_ptr())
             .to_str()
-            .map_err(|err| Error::new(ErrorKind::Other, err))?
+            .map_err(Error::other)?
     };
     let mtu = IfAddrs::new()?
         .iter()

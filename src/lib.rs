@@ -90,7 +90,7 @@ fn default_err() -> Error {
 #[cfg(not(target_os = "windows"))]
 fn unlikely_err(msg: String) -> Error {
     debug_assert!(false, "{msg}");
-    Error::new(ErrorKind::Other, msg)
+    Error::other(msg)
 }
 
 /// Align `size` to the next multiple of `align` (which needs to be a power of two).
