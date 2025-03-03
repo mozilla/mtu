@@ -457,6 +457,7 @@ jobs:
         cat <<'EOF' > /tmp/rust-android-run-tests-on-emulator.sh
         #!/bin/bash
         set -e
+        export GITHUB_ACTIONS=1
         adb wait-for-device
         while [ -z "$(adb shell getprop sys.boot_completed | tr -d '\r')" ]; do sleep 1; done
         any_failures=0
@@ -468,6 +469,7 @@ jobs:
         exit $any_failures
         EOF
         chmod a+x /tmp/rust-android-run-tests-on-emulator.sh
+        ifconfig -a
 
     - uses: reactivecircus/android-emulator-runner@62dbb605bba737720e10b196cb4220d374026a6d # v2.33.0
       with:
