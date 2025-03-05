@@ -471,9 +471,15 @@ jobs:
         set -e
         echo Heya
         ifconfig -a
+        adb shell netcfg
+        adb shell false || echo failed false
+        adb shell true || echo failed true
         export GITHUB_ACTIONS=1
         adb wait-for-device
-        while [ -z "$(adb shell getprop sys.boot_completed | tr -d '\r')" ]; do sleep 1; done
+        while [ -z "$(adb shell getprop sys.boot_completed | tr -d '\r')" ]; do
+          adb devices
+          sleep 1;
+        done
         any_failures=0
         for test in $(find target/$TARGET/debug/deps/ -type f -executable ! -name "*.so" -name "*-*"); do
           adb push "$test" /data/local/tmp/
