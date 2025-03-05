@@ -470,8 +470,8 @@ jobs:
         #!/bin/bash
         set -e
         echo Heya
-        ifconfig -a
         adb shell netcfg
+        adb shell ip addr show
         adb shell false || echo failed false
         adb shell true || echo failed true
         export GITHUB_ACTIONS=1
@@ -480,6 +480,7 @@ jobs:
           adb devices
           sleep 1;
         done
+        echo Gogogo
         any_failures=0
         for test in $(find target/$TARGET/debug/deps/ -type f -executable ! -name "*.so" -name "*-*"); do
           adb push "$test" /data/local/tmp/
