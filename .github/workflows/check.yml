@@ -470,8 +470,8 @@ jobs:
         #!/bin/bash
         set -e
         adb shell ip addr show
-        adb shell "false && echo \$?" | tr -d'\r' && echo failed false
-        adb shell "true && echo \$?" | tr -d'\r' && echo failed true
+        adb shell "false && echo \$?" | tr -d '\r' && echo failed false
+        adb shell "true && echo \$?" | tr -d '\r' && echo failed true
         export GITHUB_ACTIONS=1
         adb wait-for-device
         while [ -z "$(adb shell getprop sys.boot_completed | tr -d '\r')" ]; do
