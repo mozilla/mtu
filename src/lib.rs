@@ -171,7 +171,7 @@ mod test {
     const INET: NameMtu = NameMtu(
         None,
         if cfg!(target_os = "android") {
-            1_441 // At least inside the Android emulator we use in CI.
+            1_440 // At least inside the Android emulator we use in CI.
         } else {
             1_500
         },
