@@ -417,7 +417,7 @@ jobs:
             # Note that x86_64 image is only available for API 21+. See
             # https://github.com/ReactiveCircus/android-emulator-runner?tab=readme-ov-file#configurations.
             api-level: 21
-          - target: armv7-linux-android
+          - target: armv7-linux-androideabi
             emulator-arch: x86_64
             api-level: 21
           - target: i686-linux-android
