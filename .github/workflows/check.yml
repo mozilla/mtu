@@ -441,8 +441,8 @@ jobs:
 
     - uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12 # v4.7.0
       with:
-        distribution: 'zulu'
-        java-version: '21'
+        distribution: zulu
+        java-version: 23
 
     - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
     - run: sdkmanager --install "ndk;${{ env.NDK_VERSION }}"
@@ -469,6 +469,7 @@ jobs:
         cat <<'EOF' > /tmp/rust-android-run-tests-on-emulator.sh
         #!/bin/bash
         set -e
+        echo Heya
         ifconfig -a
         export GITHUB_ACTIONS=1
         adb wait-for-device
@@ -479,6 +480,7 @@ jobs:
           adb shell chmod +x /data/local/tmp/$(basename "$test")
           adb shell API_LEVEL=$API_LEVEL /data/local/tmp/$(basename "$test") || any_failures=1
         done
+        echo "Failures: $any_failures"
         exit $any_failures
         EOF
         chmod a+x /tmp/rust-android-run-tests-on-emulator.sh
