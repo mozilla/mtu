@@ -470,8 +470,8 @@ jobs:
         #!/bin/bash
         set -e
         adb shell ip addr show
-        adb shell "false && echo SUCCESS || echo FAIL" | | grep FAIL && echo failed false
-        adb shell "true && echo SUCCESS || echo FAIL" | | grep FAIL && echo failed true
+        adb shell "false && echo SUCCESS || echo FAIL" | grep FAIL && echo failed false
+        adb shell "true && echo SUCCESS || echo FAIL" | grep FAIL && echo failed true
         export GITHUB_ACTIONS=1
         adb wait-for-device
         while [ -z "$(adb shell getprop sys.boot_completed | tr -d '\r')" ]; do
@@ -483,7 +483,7 @@ jobs:
         for test in $(find target/$TARGET/debug/deps/ -type f -executable ! -name "*.so" -name "*-*"); do
           adb push "$test" /data/local/tmp/
           adb shell chmod +x /data/local/tmp/$(basename "$test")
-          adb shell "API_LEVEL=$API_LEVEL /data/local/tmp/$(basename "$test") && echo SUCCESS || echo FAIL" | | grep FAIL && any_failures=1
+          adb shell "API_LEVEL=$API_LEVEL /data/local/tmp/$(basename "$test") && echo SUCCESS || echo FAIL" | grep FAIL && any_failures=1
         done
         echo "Failures: $any_failures"
         exit $any_failures
