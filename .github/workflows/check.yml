@@ -475,7 +475,7 @@ jobs:
           adb push "$test" /data/local/tmp/
           adb shell chmod +x /data/local/tmp/$(basename "$test")
           # See https://unix.stackexchange.com/a/451140/409256
-          adb shell "API_LEVEL=$API_LEVEL /data/local/tmp/$(basename "$test") && echo SUCCESS >&2 || echo FAIL >&2" 2>&1 | grep FAIL && any_failures=1
+          adb shell "API_LEVEL=$API_LEVEL /data/local/tmp/$(basename "$test") || echo _FAIL_" 2>&1 | grep -E -e '' -e _FAIL_ && any_failures=1
         done
         exit $any_failures
         EOF
