@@ -411,17 +411,20 @@ jobs:
 
     strategy:
       matrix:
-        target: [x86_64-linux-android, i686-linux-android]
-        emulator-arch: [x86_64, x86]
-        api-level: [26, 25]
-        exclude:
+        include:
           - target: x86_64-linux-android
-            emulator-arch: x86
-          - target: i686-linux-android
             emulator-arch: x86_64
+            # Note that x86_64 image is only available for API 21+. See
+            # https://github.com/ReactiveCircus/android-emulator-runner?tab=readme-ov-file#configurations.
+            api-level: 21
+          - target: armv7-linux-android
+            emulator-arch: x86_64
+            api-level: 21
+          - target: i686-linux-android
+            emulator-arch: x86
+            api-level: 21
 
     steps:
-
     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       with:
         persist-credentials: false
