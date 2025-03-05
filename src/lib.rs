@@ -146,7 +146,7 @@ mod test {
         }
     }
 
-    #[cfg(any(target_os = "macos", target_os = "freebsd",))]
+    #[cfg(any(target_os = "macos", target_os = "freebsd"))]
     const LOOPBACK: &[NameMtu] = &[NameMtu(Some("lo0"), 16_384), NameMtu(Some("lo0"), 16_384)];
     #[cfg(any(target_os = "linux", target_os = "android"))]
     const LOOPBACK: &[NameMtu] = &[NameMtu(Some("lo"), 65_536), NameMtu(Some("lo"), 65_536)];
@@ -164,7 +164,14 @@ mod test {
     const LOOPBACK: &[NameMtu] = &[NameMtu(Some("lo0"), 8_232), NameMtu(Some("lo0"), 8_252)];
 
     // Non-loopback interface names are unpredictable, so we only check the MTU.
-    const INET: NameMtu = NameMtu(None, 1_500);
+    const INET: NameMtu = NameMtu(
+        None,
+        if cfg!(target_os = "android") {
+            1_440 // At least inside the Android emulator we use in CI.
+        } else {
+            1_500
+        },
+    );
 
     #[test]
     fn loopback_v4() {
