@@ -475,8 +475,11 @@ jobs:
           adb push "$test" /data/local/tmp/
           adb shell chmod +x /data/local/tmp/$(basename "$test")
           # See https://unix.stackexchange.com/a/451140/409256
+          echo before $any_failures
           adb shell "API_LEVEL=$API_LEVEL /data/local/tmp/$(basename "$test") || echo _FAIL_" 2>&1 | grep -E -e '' -e _FAIL_ && any_failures=1
+          echo after $any_failures
         done
+        echo end $any_failures
         exit $any_failures
         EOF
         chmod a+x /tmp/rust-android-run-tests-on-emulator.sh
