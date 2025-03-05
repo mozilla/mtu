@@ -469,11 +469,9 @@ jobs:
         cat <<'EOF' > /tmp/rust-android-run-tests-on-emulator.sh
         #!/bin/bash
         set -e
-        echo Heya
-        adb shell netcfg
         adb shell ip addr show
-        adb shell false || echo failed false
-        adb shell true || echo failed true
+        adb shell "false; echo \$?" || echo failed false
+        adb shell "true; echo \$?" || echo failed true
         export GITHUB_ACTIONS=1
         adb wait-for-device
         while [ -z "$(adb shell getprop sys.boot_completed | tr -d '\r')" ]; do
@@ -485,7 +483,7 @@ jobs:
         for test in $(find target/$TARGET/debug/deps/ -type f -executable ! -name "*.so" -name "*-*"); do
           adb push "$test" /data/local/tmp/
           adb shell chmod +x /data/local/tmp/$(basename "$test")
-          adb shell API_LEVEL=$API_LEVEL /data/local/tmp/$(basename "$test") || any_failures=1
+          adb shell "API_LEVEL=$API_LEVEL /data/local/tmp/$(basename "$test"); echo \$?" || any_failures=1
         done
         echo "Failures: $any_failures"
         exit $any_failures
@@ -497,6 +495,7 @@ jobs:
         api-level: ${{ env.API_LEVEL }}
         arch: ${{ matrix.emulator-arch == 'arm64-v8' && 'arm64-v8a' || matrix.emulator-arch }}
         ndk: ${{ env.NDK_VERSION }}
+        emulator-boot-timeout: 120
         script: /tmp/rust-android-run-tests-on-emulator.sh
       env:
         TARGET: ${{ matrix.target }}
