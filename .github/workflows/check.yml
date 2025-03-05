@@ -454,11 +454,7 @@ jobs:
         tools: cargo-ndk
         token: ${{ secrets.GITHUB_TOKEN }}
 
-    - run: |
-        # FIXME: Remove resetting RUSTFLAGS once Android support for neqo has landed.
-        echo "RUSTFLAGS=''" >> "$GITHUB_ENV"
-        export RUSTFLAGS=""
-        cargo -vv ndk -t ${{ matrix.target }} test --no-run
+    - run: cargo ndk -t ${{ matrix.target }} test --no-run
 
     - env:
         TARGET: ${{ matrix.target }}
@@ -470,22 +466,16 @@ jobs:
         #!/bin/bash
         set -e
         adb shell ip addr show
-        [ "$(adb shell "false && echo \$?" | tr -d '\r')" ] && echo failed false
-        [ "$(adb shell "true && echo \$?" | tr -d '\r')" ] && echo failed true
         export GITHUB_ACTIONS=1
         adb wait-for-device
-        while [ -z "$(adb shell getprop sys.boot_completed | tr -d '\r')" ]; do
-          adb devices
-          sleep 1;
-        done
+        while [ -z "$(adb shell getprop sys.boot_completed | tr -d '\r')" ]; do sleep 1; done
         any_failures=0
         for test in $(find target/$TARGET/debug/deps/ -type f -executable ! -name "*.so" -name "*-*"); do
           adb push "$test" /data/local/tmp/
           adb shell chmod +x /data/local/tmp/$(basename "$test")
-          # See
-          [ "$(adb shell "API_LEVEL=$API_LEVEL /data/local/tmp/$(basename "$test") && echo \$?" | tr -d '\r')" ] && any_failures=1
+          # See https://unix.stackexchange.com/a/451140/409256
+          adb shell "API_LEVEL=$API_LEVEL /data/local/tmp/$(basename "$test") && echo SUCCESS || echo FAIL" | grep FAIL && any_failures=1
         done
-        echo "Failures: $any_failures"
         exit $any_failures
         EOF
         chmod a+x /tmp/rust-android-run-tests-on-emulator.sh
