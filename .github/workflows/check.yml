@@ -476,7 +476,8 @@ jobs:
           adb shell chmod +x /data/local/tmp/$(basename "$test")
           # See https://unix.stackexchange.com/a/451140/409256
           echo before $any_failures
-          adb shell "API_LEVEL=$API_LEVEL /data/local/tmp/$(basename "$test") || echo _FAIL_" 2>&1 | cat - | grep _FAIL_ && any_failures=1
+          adb shell "API_LEVEL=$API_LEVEL /data/local/tmp/$(basename "$test") || echo _FAIL_" 2>&1 | tee output
+          grep _FAIL_ output && any_failures=1
           echo after $any_failures
         done
         echo end $any_failures
