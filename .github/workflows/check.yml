@@ -297,7 +297,7 @@ jobs:
             pkg install -y curl llvm
           run: | # This executes as user
             set -e
-            sh rustup.sh --default-toolchain nightly --profile minimal --component clippy llvm-tools -y
+            sh rustup.sh --default-toolchain nightly --profile minimal --component clippy,llvm-tools -y
             . "$HOME/.cargo/env"
             cargo check --all-targets
             cargo clippy -- -D warnings
@@ -341,7 +341,7 @@ jobs:
             pkgin -y install curl clang
           run: | # This executes as user
             set -e
-            sh rustup.sh --default-toolchain nightly --profile minimal --component clippy llvm-tools -y
+            sh rustup.sh --default-toolchain nightly --profile minimal --component clippy,llvm-tools -y
             . "$HOME/.cargo/env"
             cargo check --all-targets
             cargo clippy -- -D warnings
