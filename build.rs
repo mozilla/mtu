@@ -11,7 +11,7 @@ use std::env;
 const BINDINGS: &str = "bindings.rs";
 
 #[cfg(feature = "gecko")]
-fn clang_args() -> Vec<String> {
+fn clang_args(_target_os: &str) -> Vec<String> {
     use mozbuild::{config::BINDGEN_SYSTEM_FLAGS, TOPOBJDIR};
 
     let mut flags: Vec<String> = BINDGEN_SYSTEM_FLAGS.iter().map(|s| s.to_string()).collect();
@@ -30,8 +30,15 @@ fn clang_args() -> Vec<String> {
 }
 
 #[cfg(not(feature = "gecko"))]
-const fn clang_args() -> Vec<String> {
-    Vec::new()
+fn clang_args(target_os: &str) -> Vec<String> {
+    match target_os {
+        "android" => {
+            let sysroot =
+                env::var("CARGO_NDK_SYSROOT_PATH").expect("CARGO_NDK_SYSROOT_PATH was not set");
+            vec![format!("--sysroot={sysroot}")]
+        }
+        _ => Vec::new(),
+    }
 }
 
 fn bindgen() {
@@ -65,7 +72,7 @@ fn bindgen() {
     };
 
     let bindings = bindings
-        .clang_args(clang_args())
+        .clang_args(clang_args(&target_os))
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
