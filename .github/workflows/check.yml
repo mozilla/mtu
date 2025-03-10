@@ -316,7 +316,10 @@ jobs:
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE RUST_LOG GITHUB_ACTIONS RUST_TEST_TIME_UNIT RUST_TEST_TIME_INTEGRATION RUST_TEST_TIME_DOCTEST"
           prepare: | # This executes as root
             set -e
-            pkg_add rust rust-clippy llvm-16.0.6p30 # rustup doesn't support OpenBSD at all
+            pkg_add llvm-16.0.6p30 # rustup doesn't support OpenBSD at all
+            # See https://www.openbsd-desktop.rocks/posts/update-rust/
+            curl -o v1.82.tar.gz -sSf https://mega.nz/file/EqUxibpJ#Us1DM149NKzl5AL5THGBmogPDfceQgU2QiGJu17DcuA
+            tar zxvf v1.82.tar.gz
           run: | # This executes as user
             set -e
             export LIBCLANG_PATH=/usr/local/llvm16/lib
