@@ -29,6 +29,11 @@ fn clang_args() -> Vec<String> {
     flags
 }
 
+#[cfg(not(feature = "gecko"))]
+const fn clang_args() -> Vec<String> {
+    Vec::new()
+}
+
 fn bindgen() {
     let target_os = env::var("CARGO_CFG_TARGET_OS").expect("CARGO_CFG_TARGET_OS was not set");
 
