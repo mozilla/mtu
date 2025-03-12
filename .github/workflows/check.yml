@@ -458,7 +458,7 @@ jobs:
         tools: cargo-ndk
         token: ${{ secrets.GITHUB_TOKEN }}
 
-    - run: cargo ndk -t ${{ matrix.target }} test --no-run
+    - run: cargo ndk --bindgen -t ${{ matrix.target }} test --no-run
 
     - env:
         TARGET: ${{ matrix.target }}
