@@ -27,7 +27,7 @@ defaults:
 
 jobs:
   toolchains:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       toolchains: ${{ steps.toolchains.outputs.toolchains }}
     steps:
@@ -45,18 +45,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-14, windows-2025]
         rust-toolchain: ${{ fromJSON(needs.toolchains.outputs.toolchains) }}
         type: [debug]
         include:
           # Also do some release builds on the latest OS versions.
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             rust-toolchain: stable
             type: release
-          - os: macos-latest
+          - os: macos-14
             rust-toolchain: stable
             type: release
-          - os: windows-latest
+          - os: windows-2025
             rust-toolchain: stable
             type: release
           # Also do some debug builds on the oldest OS versions.
@@ -133,16 +133,16 @@ jobs:
         if: matrix.type == 'debug' && matrix.rust-toolchain == 'nightly' && endsWith(matrix.os, '-latest')
 
       - name: Run tests with sanitizers
-        if: (matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest') && matrix.rust-toolchain == 'nightly'
+        if: (matrix.os == 'ubuntu-24.04' || matrix.os == 'macos-14') && matrix.rust-toolchain == 'nightly'
         env:
           RUST_LOG: trace
           ASAN_OPTIONS: detect_leaks=1:detect_stack_use_after_return=1
         run: |
-          if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+          if [ "${{ matrix.os }}" = "ubuntu-24.04" ]; then
             sudo apt-get install -y --no-install-recommends llvm
             TARGET="x86_64-unknown-linux-gnu"
             SANITIZERS="address thread leak memory"
-          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
+          elif [ "${{ matrix.os }}" = "macos-14" ]; then
             # llvm-symbolizer (as part of llvm) is installed by default on macOS runners
             TARGET="aarch64-apple-darwin"
             # no memory and leak sanitizer support yet
@@ -167,7 +167,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-24.04, macos-14, windows-2025]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -192,7 +192,7 @@ jobs:
           RUSTDOCFLAGS: "--deny rustdoc::broken_intra_doc_links --deny warnings"
 
   machete:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -213,7 +213,7 @@ jobs:
       - run: cargo machete
 
   format:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -234,7 +234,7 @@ jobs:
       - run: cargo fmt --all -- --check
 
   semver:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -254,7 +254,7 @@ jobs:
       - run: cargo semver-checks --default-features
 
   readme:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -280,7 +280,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [freebsd, openbsd, netbsd, solaris]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       RUST_LOG: trace
 
@@ -392,7 +392,7 @@ jobs:
 
   check-cargo-lock:
     name: Ensure `Cargo.lock` contains all required dependencies
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
