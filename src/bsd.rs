@@ -246,6 +246,14 @@ struct RouteMessage {
     sa: SockaddrStorage,
 }
 
+#[cfg(target_os = "openbsd")]
+fn getrtable() -> u16 {
+    extern "C" {
+        fn getrtable() -> libc::c_int;
+    }
+    unsafe { getrtable() as u16 }
+}
+
 impl RouteMessage {
     fn new(remote: IpAddr, seq: i32) -> Result<Self> {
         let sa = SockaddrStorage::from(remote);
@@ -264,6 +272,8 @@ impl RouteMessage {
                 rtm_type: RTM_GET,
                 rtm_seq: seq,
                 rtm_addrs: RTM_ADDRS,
+                #[cfg(target_os = "openbsd")]
+                rtm_tableid: getrtable(),
                 ..Default::default()
             },
             sa,
