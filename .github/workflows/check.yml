@@ -104,14 +104,13 @@ jobs:
         env:
           RUST_LOG: trace
           TOOLCHAIN: ${{ matrix.rust-toolchain }}
-          LATEST: ${{endsWith(matrix.os, '-latest') && 'latest' || '' }}
           WINDOWS: ${{ startsWith(matrix.os, 'windows') && 'windows' || '' }}"
         run: |
           OPTIONS=(--no-fail-fast)
           if [ "$BUILD_TYPE" ]; then
             OPTIONS+=("$BUILD_TYPE")
           fi
-          if [ "$TOOLCHAIN" == "nightly" ] && [ "${{ matrix.type }}" == "debug" ] && [ "$LATEST" == "latest" ]; then
+          if [ "$TOOLCHAIN" == "nightly" ] && [ "${{ matrix.type }}" == "debug" ]; then
             cargo llvm-cov test --mcdc --include-ffi "${OPTIONS[@]}" --codecov --output-path codecov.json
           else
             if [ "$WINDOWS" == "windows" ]; then
@@ -130,7 +129,7 @@ jobs:
           verbose: true
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        if: matrix.type == 'debug' && matrix.rust-toolchain == 'nightly' && endsWith(matrix.os, '-latest')
+        if: matrix.type == 'debug' && matrix.rust-toolchain == 'nightly'
 
       - name: Run tests with sanitizers
         if: (matrix.os == 'ubuntu-24.04' || matrix.os == 'macos-14') && matrix.rust-toolchain == 'nightly'
@@ -410,7 +409,7 @@ jobs:
       - run: cargo update -w --locked
 
   check-android:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       # https://searchfox.org/mozilla-central/search?q=NDK_VERSION =&path=python/mozboot/mozboot/android.py
       NDK_VERSION: 27.2.12479018 # r27c
