@@ -315,9 +315,10 @@ jobs:
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE RUST_LOG GITHUB_ACTIONS RUST_TEST_TIME_UNIT RUST_TEST_TIME_INTEGRATION RUST_TEST_TIME_DOCTEST"
           prepare: | # This executes as root
             set -e
-            pkg_add rust rust-clippy llvm-16.0.6p30 # rustup doesn't support OpenBSD at all
+            pkg_add -z rust rust-clippy llvm # rustup doesn't support OpenBSD at all
           run: | # This executes as user
             set -e
+            ls -l /usr/local
             export LIBCLANG_PATH=/usr/local/llvm16/lib
             cargo check --all-targets
             cargo clippy -- -D warnings
