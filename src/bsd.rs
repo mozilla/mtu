@@ -251,7 +251,13 @@ fn getrtable() -> u16 {
     extern "C" {
         fn getrtable() -> libc::c_int;
     }
-    unsafe { getrtable() as u16 }
+    #[expect(
+        clippy::cast_possible_truncation, clippy::cast_sign_loss
+        reason = "`getrtable` returns a `c_int`."
+    )]
+    unsafe {
+        getrtable() as u16
+    }
 }
 
 impl RouteMessage {
