@@ -315,10 +315,10 @@ jobs:
           envs: "CARGO_TERM_COLOR RUST_BACKTRACE RUST_LOG GITHUB_ACTIONS RUST_TEST_TIME_UNIT RUST_TEST_TIME_INTEGRATION RUST_TEST_TIME_DOCTEST"
           prepare: | # This executes as root
             set -e
-            pkg_add -z rust rust-clippy llvm-19 # rustup doesn't support OpenBSD at all
+            # TODO: Is there a way to not pin the version of llvm? -z to pkg_add doesn't work.
+            pkg_add rust rust-clippy llvm-19.1.7p3 # rustup doesn't support OpenBSD at all
           run: | # This executes as user
             set -e
-            ls -l /usr/local
             export LIBCLANG_PATH=/usr/local/llvm19/lib
             cargo check --all-targets
             cargo clippy -- -D warnings
