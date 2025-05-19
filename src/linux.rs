@@ -6,7 +6,7 @@
 
 use std::{
     ffi::CStr,
-    io::{Error, ErrorKind, Read as _, Result, Write as _},
+    io::{Error, Read as _, Result, Write as _},
     net::IpAddr,
     num::TryFromIntError,
     ptr, slice,
@@ -322,13 +322,8 @@ fn if_name_mtu(if_index: i32, fd: &mut RouteSocket) -> Result<(String, usize)> {
     for attr in RtAttrs(buf.as_slice()).by_ref() {
         match attr.hdr.rta_type {
             IFLA_IFNAME => {
-                let name = CStr::from_bytes_until_nul(attr.msg)
-                    .map_err(|err| Error::new(ErrorKind::Other, err))?;
-                ifname = Some(
-                    name.to_str()
-                        .map_err(|err| Error::new(ErrorKind::Other, err))?
-                        .to_string(),
-                );
+                let name = CStr::from_bytes_until_nul(attr.msg).map_err(Error::other)?;
+                ifname = Some(name.to_str().map_err(Error::other)?.to_string());
             }
             IFLA_MTU => {
                 mtu = Some(
