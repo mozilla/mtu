@@ -113,7 +113,7 @@ pub fn interface_and_mtu_impl(remote: IpAddr) -> Result<(String, usize)> {
     // Make a slice
     let ifaces = unsafe {
         slice::from_raw_parts::<MIB_IPINTERFACE_ROW>(
-            &raw const (*if_table.0).Table[0],
+            &(*if_table.0).Table[0],
             (*if_table.0).NumEntries as usize,
         )
     };
