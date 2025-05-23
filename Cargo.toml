@@ -7,12 +7,14 @@ homepage = "https://github.com/mozilla/mtu/"
 repository = "https://github.com/mozilla/mtu/"
 authors = ["The Mozilla Necko Team <necko@mozilla.com>"]
 readme = "README.md"
-version = "0.2.8"
+version = "0.2.9"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 # Don't increase beyond what Firefox is currently using:
 # https://searchfox.org/mozilla-central/search?q=MINIMUM_RUST_VERSION&path=python/mozboot/mozboot/util.py
-rust-version = "1.82.0"
+# In addition, currently Mozilla CI uses a Rust fork before the official Rust 1.82.0 release, thus stay on 1.81.0 for now.
+# https://bugzilla.mozilla.org/show_bug.cgi?id=1968057#c1
+rust-version = "1.81.0"
 
 [badges]
 codecov = { repository = "mozilla/mtu", branch = "main" }
@@ -42,12 +44,16 @@ gecko = ["dep:mozbuild"]
 
 [lints.rust]
 absolute_paths_not_starting_with_crate = "warn"
-ambiguous_negative_literals = "warn"
+# TODO: Re-activate with MSRV 1.82.0. See
+# https://github.com/mozilla/mtu/pull/129 for details.
+# ambiguous_negative_literals = "warn"
 explicit_outlives_requirements = "warn"
 macro_use_extern_crate = "warn"
 missing_abi = "warn"
 non_ascii_idents = "warn"
-redundant_imports = "warn"
+# TODO: Re-activate with MSRV 1.82.0. See
+# https://github.com/mozilla/mtu/pull/129 for details.
+# redundant_imports = "warn"
 redundant_lifetimes = "warn"
 trivial_numeric_casts = "warn"
 unit_bindings = "warn"
