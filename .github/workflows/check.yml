@@ -109,7 +109,7 @@ jobs:
               # The codegen_windows_bindings test only succeeds when run via llvm-cov?!
               OPTIONS+=(-- --skip codegen_windows_bindings)
             fi
-            cargo test "${OPTIONS[@]}"
+            CARGO_PROFILE_BENCH_BUILD_OVERRIDE_DEBUG=true cargo test "${OPTIONS[@]}"
           fi
           cargo bench --no-run
 
