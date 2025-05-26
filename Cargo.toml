@@ -1,3 +1,4 @@
+#test
 [package]
 name = "mtu"
 description = "Obtain the local network interface MTU towards a given IP address."
