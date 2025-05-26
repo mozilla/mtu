@@ -92,14 +92,6 @@ jobs:
           tools: ${{ matrix.rust-toolchain == 'nightly' && 'cargo-llvm-cov, ' || '' }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Check
-        run: |
-          OPTIONS=(--all-targets)
-          if [ "$BUILD_TYPE" ]; then
-            OPTIONS+=("$BUILD_TYPE")
-          fi
-          cargo check "${OPTIONS[@]}"
-
       - name: Run tests and determine coverage
         env:
           RUST_LOG: trace
