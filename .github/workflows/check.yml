@@ -61,7 +61,7 @@ jobs:
             type: release
           # Also do some debug builds on the oldest OS versions.
           - os: ubuntu-22.04
-            rust-toolchain: 1.81.0
+            rust-toolchain: stable
             type: debug
           - os: macos-13
             rust-toolchain: stable
@@ -117,6 +117,7 @@ jobs:
               # The codegen_windows_bindings test only succeeds when run via llvm-cov?!
               OPTIONS+=(-- --skip codegen_windows_bindings)
             fi
+            cargo clean
             cargo test "${OPTIONS[@]}"
           fi
           cargo bench --no-run
