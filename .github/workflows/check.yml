@@ -106,6 +106,7 @@ jobs:
           TOOLCHAIN: ${{ matrix.rust-toolchain }}
           WINDOWS: ${{ startsWith(matrix.os, 'windows') && 'windows' || '' }}"
         run: |
+          cargo version -v
           OPTIONS=(--no-fail-fast)
           if [ "$BUILD_TYPE" ]; then
             OPTIONS+=("$BUILD_TYPE")
@@ -117,7 +118,6 @@ jobs:
               # The codegen_windows_bindings test only succeeds when run via llvm-cov?!
               OPTIONS+=(-- --skip codegen_windows_bindings)
             fi
-            cargo clean
             cargo test "${OPTIONS[@]}"
           fi
           cargo bench --no-run
