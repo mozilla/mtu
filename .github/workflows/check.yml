@@ -106,7 +106,6 @@ jobs:
           TOOLCHAIN: ${{ matrix.rust-toolchain }}
           WINDOWS: ${{ startsWith(matrix.os, 'windows') && 'windows' || '' }}"
         run: |
-          cargo version -v
           OPTIONS=(--no-fail-fast)
           if [ "$BUILD_TYPE" ]; then
             OPTIONS+=("$BUILD_TYPE")
