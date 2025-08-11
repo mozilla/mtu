@@ -27,6 +27,7 @@ defaults:
 
 jobs:
   toolchains:
+    name: Determine toolchains
     runs-on: ubuntu-24.04
     outputs:
       toolchains: ${{ steps.toolchains.outputs.toolchains }}
@@ -41,6 +42,7 @@ jobs:
           echo "toolchains=[\"$msrv\", \"stable\", \"nightly\"]" >> "$GITHUB_OUTPUT"
 
   check:
+    name: Check code
     needs: toolchains
     strategy:
       fail-fast: false
@@ -105,12 +107,13 @@ jobs:
           RUST_LOG: trace
           TOOLCHAIN: ${{ matrix.rust-toolchain }}
           WINDOWS: ${{ startsWith(matrix.os, 'windows') && 'windows' || '' }}"
+          TYPE: ${{ matrix.type }}
         run: |
           OPTIONS=(--no-fail-fast)
           if [ "$BUILD_TYPE" ]; then
             OPTIONS+=("$BUILD_TYPE")
           fi
-          if [ "$TOOLCHAIN" == "nightly" ] && [ "${{ matrix.type }}" == "debug" ]; then
+          if [ "$TOOLCHAIN" == "nightly" ] && [ "$TYPE" == "debug" ]; then
             cargo llvm-cov test --mcdc --include-ffi "${OPTIONS[@]}" --codecov --output-path codecov.json
           else
             if [ "$WINDOWS" == "windows" ]; then
@@ -136,12 +139,13 @@ jobs:
         env:
           RUST_LOG: trace
           ASAN_OPTIONS: detect_leaks=1:detect_stack_use_after_return=1
+          OS: ${{ matrix.os }}
         run: |
-          if [ "${{ matrix.os }}" = "ubuntu-24.04" ]; then
+          if [ "$OS" = "ubuntu-24.04" ]; then
             sudo apt-get install -y --no-install-recommends llvm
             TARGET="x86_64-unknown-linux-gnu"
             SANITIZERS="address thread leak memory"
-          elif [ "${{ matrix.os }}" = "macos-15" ]; then
+          elif [ "$OS" = "macos-15" ]; then
             # llvm-symbolizer (as part of llvm) is installed by default on macOS runners
             TARGET="aarch64-apple-darwin"
             # no memory and leak sanitizer support yet
@@ -163,6 +167,7 @@ jobs:
           done
 
   clippy:
+    name: Check code with Clippy
     strategy:
       fail-fast: false
       matrix:
@@ -191,6 +196,7 @@ jobs:
           RUSTDOCFLAGS: "--deny rustdoc::broken_intra_doc_links --deny warnings"
 
   machete:
+    name: machete 🪓
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -212,6 +218,7 @@ jobs:
       - run: cargo machete
 
   format:
+    name: Check formatting
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -233,6 +240,7 @@ jobs:
       - run: cargo fmt --all -- --check
 
   semver:
+    name: Check semver
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -253,6 +261,7 @@ jobs:
       - run: cargo semver-checks --default-features
 
   readme:
+    name: Check README.md
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -275,6 +284,7 @@ jobs:
           diff -u README.md /tmp/README.md
 
   check-vm:
+    name: Check on VMs
     strategy:
       fail-fast: false
       matrix:
@@ -410,6 +420,7 @@ jobs:
       - run: cargo update -w --locked
 
   check-android:
+    name: Check Android builds
     runs-on: ubuntu-24.04
     env:
       # https://searchfox.org/mozilla-central/search?q=NDK_VERSION =&path=python/mozboot/mozboot/android.py
@@ -449,7 +460,9 @@ jobs:
         java-version: 23
 
     - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
-    - run: sdkmanager --install "ndk;${{ env.NDK_VERSION }}"
+    - env:
+        NDK_VERSION: ${{ env.NDK_VERSION }}
+      run: sdkmanager --install "ndk;$NDK_VERSION"
 
     - uses: ./neqo/.github/actions/rust
       with:
@@ -458,7 +471,9 @@ jobs:
         tools: cargo-ndk
         token: ${{ secrets.GITHUB_TOKEN }}
 
-    - run: cargo ndk --bindgen -t ${{ matrix.target }} test --no-run
+    - env:
+        TARGET: ${{ matrix.target }}
+      run: cargo ndk --bindgen -t "$TARGET" test --no-run
 
     - env:
         TARGET: ${{ matrix.target }}
