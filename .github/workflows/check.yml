@@ -455,10 +455,10 @@ jobs:
       with:
         version: stable
         targets: ${{ matrix.target }}
-        tools: cargo-ndk
+        tools: cargo-ndk@^4
         token: ${{ secrets.GITHUB_TOKEN }}
 
-    - run: cargo ndk --bindgen -t ${{ matrix.target }} test --no-run
+    - run: cargo ndk -t ${{ matrix.target }} test --no-run
 
     - env:
         TARGET: ${{ matrix.target }}
