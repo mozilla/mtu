@@ -1,5 +1,0 @@
-allow-dbg-in-tests = true
-allow-mixed-uninlined-format-args = false
-allow-unwrap-in-tests = true
-avoid-breaking-exported-api = false # We have one consumer and can afford to break the API.
-doc-valid-idents = ["NetBSD", "OpenBSD", ".."]
